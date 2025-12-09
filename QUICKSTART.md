@@ -227,8 +227,7 @@ rm vcf_credentials.db
 
 1. **Check logs:** `logs/vcf_credentials.log`
 2. **Read troubleshooting guide:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-3. **Run test script:** `python test_db_init.py`
-4. **Check database:** `sqlite3 vcf_credentials.db ".tables"`
+3. **Check database:** `sqlite3 vcf_credentials.db ".tables"`
 
 ## 📊 System Requirements
 

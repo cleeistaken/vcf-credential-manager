@@ -267,12 +267,12 @@ rm vcf_credentials.db
 # Expected: Database verified, can login ✅
 ```
 
-### Test 3: Automated Test
+### Test 3: Verify Database
 ```bash
-# Run test script
-python test_db_init.py
+# Check database tables
+sqlite3 vcf_credentials.db ".tables"
 
-# Expected: All checks pass ✅
+# Expected: All 5 tables present ✅
 ```
 
 ## Verification Checklist

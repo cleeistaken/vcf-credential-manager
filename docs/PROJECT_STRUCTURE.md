@@ -46,12 +46,6 @@ vcf-credentials-fetch/
 │   ├── CHANGELOG.md
 │   └── START_HERE.md
 │
-├── scripts/                      # Utility Scripts
-│   ├── run.sh                    # Run Flask dev server
-│   ├── run_gunicorn.sh           # Run with Gunicorn (HTTP)
-│   ├── run_gunicorn_https.sh     # Run with Gunicorn (HTTPS)
-│   └── gunicorn_config.py        # Gunicorn configuration
-│
 ├── logs/                         # Application Logs
 │   ├── vcf_credentials.log       # General logs
 │   ├── vcf_credentials_errors.log # Error logs
@@ -130,9 +124,9 @@ Comprehensive documentation covering all aspects:
 - **UI_IMPROVEMENTS.md** - UI enhancement details
 - **CHANGELOG.md** - Version history
 
-### Scripts (`scripts/`)
+### Startup Script
 
-Utility scripts for running the application:
+The main startup script for the application:
 
 - **run.sh** - Start Flask development server
 - **run_gunicorn.sh** - Start Gunicorn (HTTP)
@@ -292,11 +286,11 @@ python app.py
 ### Using Gunicorn
 
 ```bash
-# HTTP
-./scripts/run_gunicorn.sh
+# HTTPS (recommended - handles SSL certificate generation)
+./start_https.sh
 
-# HTTPS (requires SSL certificates)
-./scripts/run_gunicorn_https.sh
+# Or manually with Gunicorn
+gunicorn --config gunicorn_config.py --certfile ssl/cert.pem --keyfile ssl/key.pem app:app
 ```
 
 ### SSL Certificates
@@ -329,8 +323,8 @@ chmod 600 instance/vcf_credentials.db
 chmod 600 ssl/key.pem
 chmod 644 ssl/cert.pem
 
-# Make scripts executable
-chmod +x scripts/*.sh
+# Make startup script executable
+chmod +x start_https.sh
 ```
 
 ## Backup and Restore

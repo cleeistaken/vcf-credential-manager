@@ -65,8 +65,8 @@ The CLI interface was redundant and added unnecessary complexity.
   - `web/models/` - Database models
   - `web/services/` - Web services (VCF fetcher, exporters)
 - **Documentation**: All docs in `docs/` directory
-- **Scripts**: All utility scripts in `scripts/` directory
-- **Configuration**: Config files in `config/` directory
+- **Startup**: `start_https.sh` - Main startup script
+- **Configuration**: `gunicorn_config.py` - Gunicorn configuration
 
 #### Added
 - **New CLI Entry Point**: `vcf-cli.py` for easy CLI access

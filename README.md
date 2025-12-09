@@ -50,11 +50,12 @@ vcf-credentials-fetch/
 │   └── js/
 │       └── dashboard.js
 ├── docs/                 # Documentation
-├── scripts/              # Utility scripts
 ├── logs/                 # Application logs
 ├── instance/             # SQLite database
 ├── ssl/                  # SSL certificates (optional)
 ├── app.py               # Main application entry point
+├── gunicorn_config.py   # Gunicorn configuration
+├── start_https.sh       # Startup script
 └── requirements.txt      # Python dependencies
 ```
 
@@ -98,7 +99,7 @@ Default credentials:
 #### HTTP (Development/Testing)
 
 ```bash
-./scripts/run_gunicorn.sh
+gunicorn --config gunicorn_config.py app:app
 ```
 
 #### HTTPS (Production)
@@ -195,7 +196,7 @@ gunicorn --config gunicorn_config.py --certfile ssl/cert.pem --keyfile ssl/key.p
 chmod 600 instance/vcf_credentials.db
 
 # Use HTTPS in production
-./scripts/run_gunicorn_https.sh
+./start_https.sh
 
 # Enable SSL verification for production systems
 # (in the web UI when adding environments)
@@ -310,7 +311,7 @@ ps aux | grep gunicorn
 pkill gunicorn
 
 # Restart
-./scripts/run_gunicorn.sh
+./start_https.sh
 ```
 
 ## 📚 Documentation
