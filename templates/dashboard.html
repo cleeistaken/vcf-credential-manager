@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h1>Environments</h1>
+    <p class="p6">Manage your VCF environments and credentials</p>
+    
+    <div style="margin: 1rem 0;">
+        <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
+            ➕ Add Environment
+        </button>
+    </div>
+    
+    <div class="clr-row" id="environments-grid">
+        {% for env in environments %}
+        <div class="clr-col-lg-4 clr-col-md-6 clr-col-12">
+            <div class="card environment-card" data-env-id="{{ env.id }}">
+                <div class="card-header">
+                    <h3>{{ env.name }}</h3>
+                </div>
+                <div class="card-block">
+                    <div class="card-text">
+                        {% if env.description %}
+                        <p>{{ env.description }}</p>
+                        {% endif %}
+                        
+                        <div class="env-info">
+                            {% if env.installer_host %}
+                            <div class="info-item">
+                                <span>🖥️ Installer: {{ env.installer_host }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if env.manager_host %}
+                            <div class="info-item">
+                                <span>🖥️ Manager: {{ env.manager_host }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="info-item">
+                                <span>🕐 Sync: {{ 'Enabled' if env.sync_enabled else 'Disabled' }}
+                                    {% if env.sync_enabled %}({{ env.sync_interval_minutes }}m){% endif %}
+                                </span>
+                            </div>
+                            
+                            {% if env.last_sync %}
+                            <div class="info-item">
+                                <span>🔄 Last sync: {{ env.last_sync.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="info-item">
+                                <span>🔑 <span id="cred-count-{{ env.id }}">Loading credentials...</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-link" onclick="viewEnvironment({{ env.id }})">
+                        👁️ View Credentials
+                    </button>
+                    <button class="btn btn-sm btn-link" onclick="syncEnvironment({{ env.id }})">
+                        🔄 Sync Now
+                    </button>
+                    <button class="btn btn-sm btn-link" onclick="editEnvironment({{ env.id }})">
+                        ✏️ Edit
+                    </button>
+                    <button class="btn btn-sm btn-link btn-danger" onclick="deleteEnvironment({{ env.id }}, '{{ env.name }}')">
+                        🗑️ Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not environments %}
+    <div class="alert alert-info">
+        No environments configured. Click "Add Environment" to get started.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add/Edit Environment Modal -->
+<clr-modal id="environmentModal" [clrModalOpen]="false" [clrModalSize]="'lg'">
+    <div class="modal" id="env-modal" style="display: none;">
+        <div class="modal-dialog" role="dialog" aria-hidden="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="modal-title">Add Environment</h3>
+                    <button aria-label="Close" class="close" type="button" onclick="closeEnvironmentModal()">
+                        ✕
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="environmentForm">
+                        <input type="hidden" id="env-id" name="id">
+                        
+                        <section class="form-block">
+                            <label>Basic Information</label>
+                            
+                            <div class="form-group">
+                                <label for="env-name" class="required">Environment Name</label>
+                                <input type="text" id="env-name" name="name" placeholder="e.g., Production" required class="clr-input">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="env-description">Description</label>
+                                <textarea id="env-description" name="description" rows="2" class="clr-textarea"></textarea>
+                            </div>
+                        </section>
+                        
+                        <section class="form-block">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                                <label style="margin: 0;">VCF Installer Configuration</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="installer-toggle" onchange="toggleInstallerSection()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            
+                            <div id="installer-section" style="display: none;">
+                                <div class="form-group">
+                                    <label for="installer-host">Installer Host</label>
+                                    <input type="text" id="installer-host" name="installer_host" placeholder="installer.example.com" class="form-control">
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="form-group">
+                                            <label for="installer-username">Username</label>
+                                            <input type="text" id="installer-username" name="installer_username" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-group">
+                                            <label for="installer-password">Password</label>
+                                            <input type="password" id="installer-password" name="installer_password" class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label style="display: flex; align-items: center;">
+                                        <input type="checkbox" id="installer-ssl-verify" name="installer_ssl_verify" checked style="margin-right: 0.5rem;">
+                                        Verify SSL certificates for Installer
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <section class="form-block">
+                            <label>SDDC Manager Configuration</label>
+                            
+                            <div class="form-group">
+                                <label for="manager-host">Manager Host</label>
+                                <input type="text" id="manager-host" name="manager_host" placeholder="sddc-manager.example.com" class="form-control">
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="form-group">
+                                        <label for="manager-username">Username</label>
+                                        <input type="text" id="manager-username" name="manager_username" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="form-group">
+                                        <label for="manager-password">Password</label>
+                                        <input type="password" id="manager-password" name="manager_password" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center;">
+                                    <input type="checkbox" id="manager-ssl-verify" name="manager_ssl_verify" checked style="margin-right: 0.5rem;">
+                                    Verify SSL certificates for Manager
+                                </label>
+                            </div>
+                        </section>
+                        
+                        <section class="form-block">
+                            <label>Sync Configuration</label>
+                            
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center;">
+                                    <input type="checkbox" id="sync-enabled" name="sync_enabled" style="margin-right: 0.5rem;">
+                                    Enable automatic sync
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sync-interval">Sync Interval (minutes)</label>
+                                <input type="number" id="sync-interval" name="sync_interval_minutes" value="60" min="5" class="form-control">
+                            </div>
+                        </section>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" type="button" onclick="testCredentials()" id="test-btn" style="margin-right: auto;">
+                        🧪 Test Connection
+                    </button>
+                    <button class="btn btn-outline" type="button" onclick="closeEnvironmentModal()">Cancel</button>
+                    <button class="btn btn-primary" type="button" onclick="saveEnvironment()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</clr-modal>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-container {
+        padding: 2rem;
+    }
+    
+    .environment-card {
+        margin-bottom: 1.5rem;
+        height: 100%;
+    }
+    
+    .environment-card .card-header h3 {
+        margin: 0;
+        font-size: 1.2rem;
+    }
+    
+    .env-info {
+        margin-top: 1rem;
+    }
+    
+    .info-item {
+        display: flex;
+        align-items: center;
+        margin: 0.5rem 0;
+        font-size: 0.9rem;
+    }
+    
+    .card-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .card-footer .btn-link {
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .btn-danger {
+        color: #c92100 !important;
+    }
+    
+    /* Modal centered on page */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        overflow-y: auto;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+    }
+    
+    .modal.show {
+        display: flex !important;
+    }
+    
+    .modal-dialog {
+        background: white;
+        border-radius: 4px;
+        max-width: 800px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        margin: auto;
+    }
+    
+    .form-block {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: #fafafa;
+        border-radius: 4px;
+    }
+    
+    .form-block > label {
+        font-weight: 600;
+        font-size: 1rem;
+        display: block;
+        margin-bottom: 1rem;
+        color: #0072a3;
+    }
+    
+    /* Toggle Switch */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+        background-color: #0072a3;
+    }
+    
+    input:checked + .toggle-slider:before {
+        transform: translateX(26px);
+    }
+    
+    .toggle-slider:hover {
+        background-color: #999;
+    }
+    
+    input:checked + .toggle-slider:hover {
+        background-color: #005a82;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
+

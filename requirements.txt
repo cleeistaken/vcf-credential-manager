@@ -1,0 +1,32 @@
+# VCF Credentials Fetch Web Application Requirements
+
+# Web Framework
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+
+# Database
+SQLAlchemy==2.0.35
+
+# Scheduling
+APScheduler==3.10.4
+
+# HTTP Requests
+requests==2.31.0
+urllib3==2.1.0
+
+# Excel Export
+openpyxl==3.1.2
+
+# Security
+Werkzeug==3.0.1
+
+# YAML Configuration (for backward compatibility)
+PyYAML==6.0.1
+
+# Production WSGI Server (optional, for production deployment)
+gunicorn==21.2.0
+
+# Development tools (optional)
+python-dotenv==1.0.0
+

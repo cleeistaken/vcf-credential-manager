@@ -1,0 +1,633 @@
+{% extends "base.html" %}
+
+{% block title %}{{ environment.name }} - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="environment-view-container">
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+                ← Back to Dashboard
+            </a>
+            <h1>{{ environment.name }}</h1>
+            {% if environment.description %}
+            <p class="p6">{{ environment.description }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="header-actions">
+            <button class="btn btn-sm btn-outline" onclick="syncCredentials()">
+                🔄 Sync Now
+            </button>
+            <button class="btn btn-sm btn-success-outline" onclick="exportCSV()">
+                📄 Export CSV
+            </button>
+            <button class="btn btn-sm btn-success-outline" onclick="exportExcel()">
+                📊 Export Excel
+            </button>
+        </div>
+    </div>
+    
+    <div class="environment-info">
+        <div class="clr-row">
+            {% if environment.installer_host %}
+            <div class="col-4">
+                <div class="info-card">
+                    <div style="font-size: 24px;">🖥️</div>
+                    <div>
+                        <div class="info-label">VCF Installer</div>
+                        <div class="info-value">{{ environment.installer_host }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if environment.manager_host %}
+            <div class="col-4">
+                <div class="info-card">
+                    <div style="font-size: 24px;">🖥️</div>
+                    <div>
+                        <div class="info-label">SDDC Manager</div>
+                        <div class="info-value">{{ environment.manager_host }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="col-4">
+                <div class="info-card">
+                    <div style="font-size: 24px;">🕐</div>
+                    <div>
+                        <div class="info-label">Last Sync</div>
+                        <div class="info-value">
+                            {% if environment.last_sync %}
+                            {{ environment.last_sync.strftime('%Y-%m-%d %H:%M:%S') }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="credentials-section">
+        <h3>Credentials</h3>
+        
+        <div class="search-filter">
+            <input type="text" id="search-input" class="clr-input" placeholder="Search credentials..." onkeyup="filterCredentials()">
+        </div>
+        
+        <div id="loading-spinner" style="display: none; text-align: center; padding: 2rem;">
+            <span class="spinner"></span>
+            <span style="margin-left: 0.5rem;">Loading...</span>
+        </div>
+        
+        <table class="table table-compact" id="credentials-table">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>Username</th>
+                    <th>Password</th>
+                    <th>Credential Type</th>
+                    <th>Account Type</th>
+                    <th>Resource Type</th>
+                    <th>Domain</th>
+                    <th>Source</th>
+                    <th>Last Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="credentials-tbody">
+                <!-- Credentials will be loaded via JavaScript -->
+            </tbody>
+        </table>
+        
+        <div id="no-credentials" style="display: none;">
+            <div class="alert alert-info">
+                No credentials found. Click "Sync Now" to fetch credentials.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy notification -->
+<div id="copy-notification" class="alert alert-success" style="display: none; position: fixed; top: 80px; right: 20px; z-index: 1000; min-width: 250px;">
+    Copied to clipboard!
+</div>
+
+<!-- Password History Modal -->
+<div id="history-modal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeHistoryModal()"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Password History</h3>
+                <button class="btn-close" onclick="closeHistoryModal()" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="history-credential-info" style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f8f8; border-radius: 4px;">
+                    <div><strong>Hostname:</strong> <span id="history-hostname"></span></div>
+                    <div><strong>Username:</strong> <span id="history-username"></span></div>
+                    <div><strong>Current Password:</strong> <span id="history-current-password" class="password-hidden"></span>
+                        <button class="btn btn-sm btn-link" onclick="toggleHistoryPassword('history-current-password')" title="Show/Hide">👁️</button>
+                    </div>
+                    <div><strong>Last Updated:</strong> <span id="history-last-updated"></span></div>
+                </div>
+                
+                <h4>Previous Passwords</h4>
+                <div id="history-loading" style="text-align: center; padding: 2rem;">
+                    <span class="spinner"></span>
+                    <span style="margin-left: 0.5rem;">Loading...</span>
+                </div>
+                <div id="history-content" style="display: none;">
+                    <table class="table table-compact">
+                        <thead>
+                            <tr>
+                                <th>Password</th>
+                                <th>Changed At</th>
+                                <th>Changed By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                        </tbody>
+                    </table>
+                    <div id="no-history" style="display: none; padding: 2rem; text-align: center; color: #666;">
+                        No password history available
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeHistoryModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .environment-view-container {
+        padding: 2rem;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+    }
+    
+    .header-content h1 {
+        margin: 0.5rem 0;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .environment-info {
+        margin-bottom: 2rem;
+    }
+    
+    .info-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #fafafa;
+        border-radius: 4px;
+        border-left: 4px solid #0072a3;
+    }
+    
+    .info-card cds-icon {
+        --color: #0072a3;
+    }
+    
+    .info-label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-value {
+        font-size: 1rem;
+        font-weight: 500;
+        margin-top: 0.25rem;
+    }
+    
+    .credentials-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .credentials-section h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+    
+    .search-filter {
+        margin-bottom: 1rem;
+    }
+    
+    .search-filter input {
+        max-width: 400px;
+    }
+    
+    .table {
+        margin-top: 1rem;
+    }
+    
+    .password-cell {
+        font-family: monospace;
+        position: relative;
+    }
+    
+    .password-hidden {
+        color: transparent;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+        user-select: none;
+    }
+    
+    .btn-icon {
+        padding: 0.25rem;
+        min-width: auto;
+    }
+    
+    .spinner {
+        display: inline-block;
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 3px solid #e0e0e0;
+        border-top-color: #0072a3;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: middle;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* History Modal Styles */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+    }
+    
+    .modal-dialog {
+        position: relative;
+        z-index: 1060;
+        width: 90%;
+        max-width: 900px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .modal-dialog.modal-lg {
+        max-width: 1000px;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+    }
+    
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+    }
+    
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+    }
+    
+    .btn-close:hover {
+        color: #000;
+    }
+    
+    .modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #dee2e6;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .credential-link {
+        text-decoration: none;
+        color: #0066cc;
+        padding: 0;
+        font-weight: normal;
+        cursor: pointer;
+        background: none;
+        border: none;
+        text-align: left;
+    }
+    
+    .credential-link:hover {
+        text-decoration: underline;
+        color: #004499;
+    }
+    
+    .btn-primary {
+        background-color: #0066cc;
+        color: white;
+        border: 1px solid #0066cc;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+    
+    .btn-primary:hover {
+        background-color: #0052a3;
+        border-color: #0052a3;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const environmentId = {{ environment.id }};
+    let credentials = [];
+    
+    // Load credentials on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCredentials();
+    });
+    
+    async function loadCredentials() {
+        document.getElementById('loading-spinner').style.display = 'block';
+        document.getElementById('credentials-table').style.display = 'none';
+        document.getElementById('no-credentials').style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/environments/${environmentId}/credentials`);
+            credentials = await response.json();
+            
+            document.getElementById('loading-spinner').style.display = 'none';
+            
+            if (credentials.length === 0) {
+                document.getElementById('no-credentials').style.display = 'block';
+            } else {
+                document.getElementById('credentials-table').style.display = 'table';
+                renderCredentials(credentials);
+            }
+        } catch (error) {
+            console.error('Error loading credentials:', error);
+            document.getElementById('loading-spinner').style.display = 'none';
+            alert('Failed to load credentials');
+        }
+    }
+    
+    function renderCredentials(creds) {
+        const tbody = document.getElementById('credentials-tbody');
+        tbody.innerHTML = '';
+        
+        creds.forEach(cred => {
+            const tr = document.createElement('tr');
+            const sourceIcon = cred.source === 'VCF_INSTALLER' ? '🔧' : '🖥️';
+            const sourceLabel = cred.source === 'VCF_INSTALLER' ? 'Installer' : 'Manager';
+            
+            tr.innerHTML = `
+                <td>${cred.hostname || ''}</td>
+                <td>${cred.username || ''}</td>
+                <td class="password-cell">
+                    <span class="password-hidden" id="pwd-${cred.id}">${cred.password || ''}</span>
+                </td>
+                <td>${cred.credential_type || ''}</td>
+                <td>${cred.account_type || ''}</td>
+                <td>${cred.resource_type || ''}</td>
+                <td>${cred.domain_name || ''}</td>
+                <td><span title="${cred.source || 'SDDC_MANAGER'}">${sourceIcon} ${sourceLabel}</span></td>
+                <td>${cred.last_updated ? new Date(cred.last_updated).toLocaleString() : ''}</td>
+                <td>
+                    <button class="btn btn-sm btn-link" onclick="togglePassword(${cred.id})" title="Show/Hide Password">
+                        👁️
+                    </button>
+                    <button class="btn btn-sm btn-link" onclick="copyPassword(${cred.id}, '${cred.password}')" title="Copy Password">
+                        📋
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="showHistory(${cred.id})" title="View Password History">
+                        📜 History
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    
+    function togglePassword(credId) {
+        const element = document.getElementById(`pwd-${credId}`);
+        element.classList.toggle('password-hidden');
+    }
+    
+    function copyPassword(credId, password) {
+        navigator.clipboard.writeText(password).then(() => {
+            showCopyNotification();
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+    
+    function showCopyNotification() {
+        const notification = document.getElementById('copy-notification');
+        notification.style.display = 'block';
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 2000);
+    }
+    
+    function filterCredentials() {
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        const filtered = credentials.filter(cred => {
+            return (cred.hostname || '').toLowerCase().includes(searchTerm) ||
+                   (cred.username || '').toLowerCase().includes(searchTerm) ||
+                   (cred.resource_type || '').toLowerCase().includes(searchTerm) ||
+                   (cred.domain_name || '').toLowerCase().includes(searchTerm);
+        });
+        renderCredentials(filtered);
+    }
+    
+    async function syncCredentials() {
+        if (!confirm('This will fetch the latest credentials from the VCF environment. Continue?')) {
+            return;
+        }
+        
+        document.getElementById('loading-spinner').style.display = 'block';
+        
+        try {
+            const response = await fetch(`/api/environments/${environmentId}/sync`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                await loadCredentials();
+                alert('Credentials synced successfully');
+                location.reload();
+            } else {
+                throw new Error('Sync failed');
+            }
+        } catch (error) {
+            console.error('Error syncing credentials:', error);
+            document.getElementById('loading-spinner').style.display = 'none';
+            alert('Failed to sync credentials');
+        }
+    }
+    
+    function exportCSV() {
+        window.location.href = `/api/environments/${environmentId}/export/csv`;
+    }
+    
+    function exportExcel() {
+        window.location.href = `/api/environments/${environmentId}/export/excel`;
+    }
+    
+    // Password History Functions
+    async function showHistory(credId) {
+        const modal = document.getElementById('history-modal');
+        const loading = document.getElementById('history-loading');
+        const content = document.getElementById('history-content');
+        
+        modal.style.display = 'block';
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/credentials/${credId}/history`);
+            if (!response.ok) throw new Error('Failed to load history');
+            
+            const data = await response.json();
+            
+            // Update credential info
+            document.getElementById('history-hostname').textContent = data.credential.hostname;
+            document.getElementById('history-username').textContent = data.credential.username;
+            document.getElementById('history-current-password').textContent = data.credential.current_password;
+            document.getElementById('history-last-updated').textContent = 
+                data.credential.last_updated ? new Date(data.credential.last_updated).toLocaleString() : 'Never';
+            
+            // Render history table
+            const tbody = document.getElementById('history-tbody');
+            tbody.innerHTML = '';
+            
+            if (data.history && data.history.length > 0) {
+                data.history.forEach((entry, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="password-cell">
+                            <span class="password-hidden" id="hist-pwd-${index}">${entry.password}</span>
+                        </td>
+                        <td>${entry.changed_at ? new Date(entry.changed_at).toLocaleString() : ''}</td>
+                        <td>${entry.changed_by || 'SYSTEM'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-link" onclick="toggleHistoryPassword('hist-pwd-${index}')" title="Show/Hide">
+                                👁️
+                            </button>
+                            <button class="btn btn-sm btn-link" onclick="copyHistoryPassword('${entry.password}')" title="Copy">
+                                📋
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('no-history').style.display = 'none';
+            } else {
+                document.getElementById('no-history').style.display = 'block';
+            }
+            
+            loading.style.display = 'none';
+            content.style.display = 'block';
+        } catch (error) {
+            console.error('Error loading history:', error);
+            alert('Failed to load password history');
+            closeHistoryModal();
+        }
+    }
+    
+    function closeHistoryModal() {
+        document.getElementById('history-modal').style.display = 'none';
+    }
+    
+    function toggleHistoryPassword(elementId) {
+        const element = document.getElementById(elementId);
+        element.classList.toggle('password-hidden');
+    }
+    
+    function copyHistoryPassword(password) {
+        navigator.clipboard.writeText(password).then(() => {
+            showCopyNotification();
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+    
+    // Close modal when clicking outside
+    document.addEventListener('click', function(event) {
+        const modal = document.getElementById('history-modal');
+        if (event.target === modal) {
+            closeHistoryModal();
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeHistoryModal();
+        }
+    });
+</script>
+{% endblock %}
+

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VCF Credentials Manager{% endblock %}</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+        }
+        
+        /* Header */
+        .header {
+            background-color: #313131;
+            color: white;
+            padding: 0 1.5rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header .branding a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.25rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .header a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .header a:hover {
+            background-color: #444;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        /* Content */
+        .content-container {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Alerts */
+        .alert {
+            padding: 1rem 1rem 1rem 3rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            border-left: 4px solid;
+            position: relative;
+        }
+        
+        .alert::before {
+            content: "ℹ";
+            position: absolute;
+            left: 1rem;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        
+        .alert-success {
+            background-color: #e1f5e1;
+            border-color: #62a420;
+            color: #2d5016;
+        }
+        
+        .alert-success::before {
+            content: "✓";
+            color: #62a420;
+        }
+        
+        .alert-danger {
+            background-color: #ffeaea;
+            border-color: #c92100;
+            color: #5c0f00;
+        }
+        
+        .alert-danger::before {
+            content: "✕";
+            color: #c92100;
+        }
+        
+        .alert-info {
+            background-color: #e1f1f6;
+            border-color: #0072a3;
+            color: #003d5c;
+        }
+        
+        .alert-info::before {
+            content: "ℹ";
+            color: #0072a3;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+            background-color: transparent;
+        }
+        
+        .btn-primary {
+            background-color: #0072a3;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #005a82;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #0072a3;
+            color: #0072a3;
+        }
+        
+        .btn-outline:hover {
+            background-color: #0072a3;
+            color: white;
+        }
+        
+        .btn-success-outline {
+            background-color: transparent;
+            border: 1px solid #62a420;
+            color: #62a420;
+        }
+        
+        .btn-success-outline:hover {
+            background-color: #62a420;
+            color: white;
+        }
+        
+        .btn-link {
+            background: none;
+            border: none;
+            color: #0072a3;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .btn-link:hover {
+            text-decoration: underline;
+            background-color: rgba(0, 114, 163, 0.1);
+        }
+        
+        .btn-sm {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        
+        .btn-danger {
+            color: #c92100 !important;
+        }
+        
+        .btn-danger:hover {
+            background-color: rgba(201, 33, 0, 0.1);
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .card-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: #fafafa;
+        }
+        
+        .card-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #313131;
+        }
+        
+        .card-block {
+            padding: 1rem;
+            flex: 1;
+        }
+        
+        .card-text {
+            color: #666;
+        }
+        
+        .card-footer {
+            padding: 0.75rem 1rem;
+            border-top: 1px solid #e0e0e0;
+            background-color: #fafafa;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Table */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .table thead {
+            background-color: #fafafa;
+        }
+        
+        .table th {
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 0.875rem;
+            color: #313131;
+        }
+        
+        .table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.875rem;
+        }
+        
+        .table tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        /* Grid */
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -0.5rem;
+        }
+        
+        .col-4 {
+            flex: 0 0 33.333%;
+            padding: 0 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .col-6 {
+            flex: 0 0 50%;
+            padding: 0 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .col-12 {
+            flex: 0 0 100%;
+            padding: 0 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        @media (max-width: 992px) {
+            .col-4 {
+                flex: 0 0 50%;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .col-4, .col-6 {
+                flex: 0 0 100%;
+            }
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: #313131;
+        }
+        
+        .form-group label.required::after {
+            content: " *";
+            color: #c92100;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-family: inherit;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #0072a3;
+            box-shadow: 0 0 0 2px rgba(0, 114, 163, 0.1);
+        }
+        
+        textarea.form-control {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .modal-dialog {
+            background: white;
+            border-radius: 4px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #fafafa;
+        }
+        
+        .modal-title {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #313131;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            background-color: #fafafa;
+        }
+        
+        .close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        
+        .close:hover {
+            background-color: #e0e0e0;
+            color: #000;
+        }
+        
+        /* Utility */
+        .text-muted {
+            color: #666;
+        }
+        
+        h1 {
+            margin-bottom: 0.5rem;
+            color: #313131;
+        }
+        
+        h2, h3 {
+            color: #313131;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+        }
+        
+        .p6 {
+            font-size: 0.875rem;
+            color: #666;
+        }
+        
+        /* Info items */
+        .info-item {
+            display: flex;
+            align-items: center;
+            margin: 0.5rem 0;
+            font-size: 0.875rem;
+            color: #666;
+        }
+        
+        .info-item::before {
+            content: "•";
+            margin-right: 0.5rem;
+            color: #0072a3;
+            font-weight: bold;
+        }
+        
+        /* Info cards */
+        .info-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #fafafa;
+            border-radius: 4px;
+            border-left: 4px solid #0072a3;
+        }
+        
+        .info-label {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-value {
+            font-size: 1rem;
+            font-weight: 500;
+            margin-top: 0.25rem;
+            color: #313131;
+        }
+        
+        /* Search input */
+        input[type="text"].search-input {
+            max-width: 400px;
+            margin-bottom: 1rem;
+        }
+        
+        /* Password cell */
+        .password-cell {
+            font-family: 'Courier New', monospace;
+        }
+        
+        .password-hidden {
+            color: transparent;
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+            user-select: none;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <div class="main-container">
+        <header class="header">
+            <div class="branding">
+                <a href="{{ url_for('dashboard') }}">
+                    🔐 VCF Credentials Manager
+                </a>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <span style="color: #ccc;">|</span>
+                <span>{{ current_user.username }}</span>
+                <a href="{{ url_for('change_password') }}">🔒 Change Password</a>
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </header>
+        
+        <div class="content-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    {% else %}
+    {% block login_content %}{% endblock %}
+    {% endif %}
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Login - VCF Credentials Manager{% endblock %}
+
+{% block login_content %}
+<style>
+    body {
+        background: linear-gradient(135deg, #001a33 0%, #003d5c 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+    }
+    
+    .login-wrapper {
+        width: 100%;
+        max-width: 420px;
+        padding: 20px;
+    }
+    
+    .login-form {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 2.5rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    
+    .login-title {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .login-title h2 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #313131;
+        margin-bottom: 0.5rem;
+    }
+    
+    .login-title .welcome {
+        font-size: 1rem;
+        font-weight: 400;
+        color: #666;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+    
+    .login-title .hint {
+        font-size: 0.875rem;
+        color: #999;
+        margin-top: 0.5rem;
+        display: block;
+    }
+    
+    .login-form .form-group {
+        margin-bottom: 1.25rem;
+    }
+    
+    .login-form .form-control {
+        padding: 0.75rem;
+        font-size: 1rem;
+    }
+    
+    .login-form .btn-primary {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 1rem;
+        margin-top: 0.5rem;
+    }
+    
+    .login-form .alert {
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .login-icon {
+        text-align: center;
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+</style>
+
+<div class="login-wrapper">
+    <form class="login-form" method="POST" action="{{ url_for('login') }}">
+        <div class="login-icon">🔐</div>
+        
+        <div class="login-title">
+            <span class="welcome">Welcome to</span>
+            <h2>VCF Credentials Manager</h2>
+            <span class="hint">Secure credential management for VMware Cloud Foundation</span>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input class="form-control" type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input class="form-control" type="password" id="password" name="password" placeholder="Enter your password" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">LOGIN</button>
+    </form>
+</div>
+{% endblock %}
+

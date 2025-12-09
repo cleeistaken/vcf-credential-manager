@@ -103,6 +103,20 @@ Default credentials:
 
 #### HTTPS (Production)
 
+**Recommended Method - Use the startup script:**
+```bash
+./start_https.sh
+```
+
+This script will:
+- Check for virtual environment activation
+- Create necessary directories (logs, ssl)
+- Generate self-signed SSL certificates if needed
+- Initialize the database on first run
+- Start Gunicorn with HTTPS support
+
+**Manual Method:**
+
 1. Generate SSL certificates:
 ```bash
 mkdir -p ssl
@@ -112,10 +126,13 @@ openssl req -x509 -newkey rsa:4096 -nodes \
 
 2. Run with HTTPS:
 ```bash
-./scripts/run_gunicorn_https.sh
+gunicorn --config gunicorn_config.py --certfile ssl/cert.pem --keyfile ssl/key.pem app:app
 ```
 
-See [docs/GUNICORN_GUIDE.md](docs/GUNICORN_GUIDE.md) for detailed deployment instructions.
+**Important Notes:**
+- The application uses `preload_app = True` in Gunicorn config to ensure proper database initialization
+- On first startup, the database and default admin user are created automatically
+- Default credentials: admin / admin (change immediately after first login!)
 
 ## 📖 How to Use
 
