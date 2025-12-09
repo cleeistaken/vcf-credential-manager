@@ -108,40 +108,6 @@ scheduler.start()
 app.logger.info("Background scheduler started")
 
 
-def init_database():
-    """Initialize database and create default admin user if needed"""
-    with app.app_context():
-        try:
-            # Create all tables
-            db.create_all()
-            app.logger.info("Database tables created/verified")
-            
-            # Create default admin if no users exist
-            if User.query.count() == 0:
-                admin = User(
-                    username='admin',
-                    password_hash=generate_password_hash('admin'),
-                    is_admin=True
-                )
-                db.session.add(admin)
-                db.session.commit()
-                app.logger.info("Created default admin user (username: admin, password: admin)")
-            
-            # Schedule all enabled environments
-            environments = Environment.query.filter_by(sync_enabled=True).all()
-            for env in environments:
-                schedule_environment_sync(env)
-                
-            app.logger.info("Database initialization complete")
-        except Exception as e:
-            app.logger.error(f"Error initializing database: {e}", exc_info=True)
-            raise
-
-
-# Initialize database when app is created (works with both Flask dev server and Gunicorn)
-init_database()
-
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -294,6 +260,40 @@ def schedule_environment_sync(environment):
             replace_existing=True
         )
         app.logger.info(f"Scheduled sync for {environment.name} every {environment.sync_interval_minutes} minutes")
+
+
+def init_database():
+    """Initialize database and create default admin user if needed"""
+    with app.app_context():
+        try:
+            # Create all tables
+            db.create_all()
+            app.logger.info("Database tables created/verified")
+            
+            # Create default admin if no users exist
+            if User.query.count() == 0:
+                admin = User(
+                    username='admin',
+                    password_hash=generate_password_hash('admin'),
+                    is_admin=True
+                )
+                db.session.add(admin)
+                db.session.commit()
+                app.logger.info("Created default admin user (username: admin, password: admin)")
+            
+            # Schedule all enabled environments
+            environments = Environment.query.filter_by(sync_enabled=True).all()
+            for env in environments:
+                schedule_environment_sync(env)
+                
+            app.logger.info("Database initialization complete")
+        except Exception as e:
+            app.logger.error(f"Error initializing database: {e}", exc_info=True)
+            raise
+
+
+# Initialize database when app is created (works with both Flask dev server and Gunicorn)
+init_database()
 
 
 @app.route('/')
