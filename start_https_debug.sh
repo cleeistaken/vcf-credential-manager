@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Start VCF Credentials Manager with HTTPS
-# This script ensures proper initialization for first-time startup
+# Start VCF Credentials Manager with HTTPS and DEBUG MODE
+# This script enables verbose logging for troubleshooting
 #
 
 set -e
@@ -12,8 +12,10 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}VCF Credentials Manager - HTTPS Startup${NC}"
+echo -e "${GREEN}VCF Credentials Manager - HTTPS Startup (DEBUG MODE)${NC}"
 echo "=========================================="
+echo -e "${YELLOW}⚠️  DEBUG MODE ENABLED - Verbose logging active${NC}"
+echo ""
 
 # Check if virtual environment is activated
 if [ -z "$VIRTUAL_ENV" ]; then
@@ -50,12 +52,17 @@ if [ ! -f "vcf_credentials.db" ]; then
     echo -e "${RED}IMPORTANT: Change the default password after first login!${NC}"
 fi
 
-# Start Gunicorn with HTTPS
+# Start Gunicorn with HTTPS and DEBUG MODE
 echo ""
-echo "Starting Gunicorn with HTTPS..."
+echo "Starting Gunicorn with HTTPS and DEBUG MODE..."
 echo "Access the application at: https://localhost:5000"
 echo "Press Ctrl+C to stop"
 echo ""
+echo -e "${YELLOW}Debug logs will be written to: logs/vcf_credentials.log${NC}"
+echo ""
+
+# Export DEBUG_MODE environment variable
+export DEBUG_MODE=true
 
 # Fix for macOS fork() issue with Objective-C frameworks
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
@@ -65,4 +72,3 @@ exec gunicorn \
     --certfile ssl/cert.pem \
     --keyfile ssl/key.pem \
     app:app
-

@@ -38,6 +38,13 @@ tmp_upload_dir = None
 # Preload app to initialize database before forking workers
 preload_app = True
 
+# macOS-specific: Disable fork safety for Objective-C frameworks
+# This prevents crashes when fork() is called with Objective-C initialized
+def pre_fork(server, worker):
+    """Called just before a worker is forked"""
+    import os
+    os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
+
 # SSL (only if using HTTPS directly with Gunicorn)
 # Uncomment and configure these if you want Gunicorn to handle SSL
 # keyfile = 'ssl/key.pem'

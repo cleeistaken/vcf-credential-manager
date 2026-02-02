@@ -29,8 +29,11 @@ def setup_logging(app):
     if not os.path.exists('logs'):
         os.makedirs('logs')
     
-    # Set logging level based on environment
-    log_level = logging.DEBUG if app.debug else logging.INFO
+    # Set logging level based on environment and DEBUG_MODE
+    if DEBUG_MODE or app.debug:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
     
     # Create formatters
     detailed_formatter = logging.Formatter(
@@ -94,6 +97,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///vcf_credentials.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Debug mode - set via environment variable
+# DEBUG_MODE=true for verbose logging
+DEBUG_MODE = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
 
 # Setup logging
 setup_logging(app)

@@ -19,6 +19,8 @@ class VCFCredentialFetcher:
     
     def __init__(self):
         self.session = requests.Session()
+        # Set timeout for all requests
+        self.timeout = 30
     
     def _get_token(self, host: str, username: str, password: str, ssl_verify: bool = False) -> str:
         """Get authentication token"""
@@ -29,9 +31,33 @@ class VCFCredentialFetcher:
             "password": password,
         }
         
-        response = self.session.post(url, json=payload, headers=headers, verify=ssl_verify)
-        response.raise_for_status()
-        return response.json().get("accessToken")
+        logger.debug(f"Requesting token from {url} (SSL verify: {ssl_verify})")
+        
+        try:
+            response = self.session.post(
+                url, 
+                json=payload, 
+                headers=headers, 
+                verify=ssl_verify,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            token = response.json().get("accessToken")
+            logger.debug(f"Successfully obtained token from {host}")
+            return token
+        except requests.exceptions.SSLError as e:
+            logger.error(f"SSL Error connecting to {host}: {e}")
+            logger.debug(f"SSL verify was set to: {ssl_verify}")
+            raise
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Timeout connecting to {host}: {e}")
+            raise
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error to {host}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error getting token from {host}: {e}")
+            raise
     
     def fetch_from_installer(self, host: str, username: str, password: str, ssl_verify: bool = False) -> List[Dict]:
         """Fetch credentials from VCF Installer"""
@@ -48,7 +74,7 @@ class VCFCredentialFetcher:
                 "Accept": "application/json"
             }
             
-            response = self.session.get(url, headers=headers, verify=ssl_verify)
+            response = self.session.get(url, headers=headers, verify=ssl_verify, timeout=self.timeout)
             response.raise_for_status()
             sddcs = response.json().get("elements", [])
             
@@ -62,7 +88,7 @@ class VCFCredentialFetcher:
                 if sddc_id:
                     try:
                         spec_url = f"https://{host}/v1/sddcs/{sddc_id}/spec"
-                        spec_response = self.session.get(spec_url, headers=headers, verify=ssl_verify)
+                        spec_response = self.session.get(spec_url, headers=headers, verify=ssl_verify, timeout=self.timeout)
                         spec_response.raise_for_status()
                         spec_data = spec_response.json()
                         
@@ -400,7 +426,7 @@ class VCFCredentialFetcher:
             "Accept": "application/json"
         }
         
-        response = self.session.get(url, headers=headers, verify=ssl_verify)
+        response = self.session.get(url, headers=headers, verify=ssl_verify, timeout=self.timeout)
         response.raise_for_status()
         credentials = response.json().get("elements", [])
         
