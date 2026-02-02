@@ -76,7 +76,7 @@
         <h3>Credentials</h3>
         
         <div class="search-filter">
-            <input type="text" id="search-input" class="clr-input" placeholder="Search credentials..." onkeyup="filterCredentials()">
+            <input type="text" id="search-input" class="clr-input" placeholder="Search credentials..." onkeyup="applyFilters()">
         </div>
         
         <div id="loading-spinner" style="display: none; text-align: center; padding: 2rem;">
@@ -97,6 +97,44 @@
                     <th>Source</th>
                     <th>Last Updated</th>
                     <th>Actions</th>
+                </tr>
+                <tr class="filter-row">
+                    <th>
+                        <input type="text" class="filter-input" id="filter-hostname" placeholder="Filter..." onkeyup="applyFilters()">
+                    </th>
+                    <th>
+                        <input type="text" class="filter-input" id="filter-username" placeholder="Filter..." onkeyup="applyFilters()">
+                    </th>
+                    <th></th>
+                    <th>
+                        <select class="filter-select" id="filter-credential-type" onchange="applyFilters()">
+                            <option value="">All</option>
+                        </select>
+                    </th>
+                    <th>
+                        <select class="filter-select" id="filter-account-type" onchange="applyFilters()">
+                            <option value="">All</option>
+                        </select>
+                    </th>
+                    <th>
+                        <select class="filter-select" id="filter-resource-type" onchange="applyFilters()">
+                            <option value="">All</option>
+                        </select>
+                    </th>
+                    <th>
+                        <input type="text" class="filter-input" id="filter-domain" placeholder="Filter..." onkeyup="applyFilters()">
+                    </th>
+                    <th>
+                        <select class="filter-select" id="filter-source" onchange="applyFilters()">
+                            <option value="">All</option>
+                            <option value="VCF_INSTALLER">Installer</option>
+                            <option value="SDDC_MANAGER">Manager</option>
+                        </select>
+                    </th>
+                    <th></th>
+                    <th>
+                        <button class="btn btn-sm btn-link" onclick="clearFilters()" title="Clear all filters">🔄 Clear</button>
+                    </th>
                 </tr>
             </thead>
             <tbody id="credentials-tbody">
@@ -242,6 +280,31 @@
     
     .table {
         margin-top: 1rem;
+    }
+    
+    .filter-row {
+        background-color: #f8f8f8;
+    }
+    
+    .filter-row th {
+        padding: 0.5rem;
+        vertical-align: middle;
+    }
+    
+    .filter-input,
+    .filter-select {
+        width: 100%;
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        font-size: 0.875rem;
+    }
+    
+    .filter-input:focus,
+    .filter-select:focus {
+        outline: none;
+        border-color: #0072a3;
+        box-shadow: 0 0 0 2px rgba(0, 114, 163, 0.1);
     }
     
     .password-cell {
@@ -424,6 +487,7 @@
                 document.getElementById('no-credentials').style.display = 'block';
             } else {
                 document.getElementById('credentials-table').style.display = 'table';
+                populateFilterDropdowns();
                 renderCredentials(credentials);
             }
         } catch (error) {
@@ -470,6 +534,43 @@
         });
     }
     
+    function populateFilterDropdowns() {
+        // Get unique values for each filterable column
+        const credentialTypes = [...new Set(credentials.map(c => c.credential_type).filter(v => v))].sort();
+        const accountTypes = [...new Set(credentials.map(c => c.account_type).filter(v => v))].sort();
+        const resourceTypes = [...new Set(credentials.map(c => c.resource_type).filter(v => v))].sort();
+        
+        // Populate credential type dropdown
+        const credTypeSelect = document.getElementById('filter-credential-type');
+        credTypeSelect.innerHTML = '<option value="">All</option>';
+        credentialTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            credTypeSelect.appendChild(option);
+        });
+        
+        // Populate account type dropdown
+        const accountTypeSelect = document.getElementById('filter-account-type');
+        accountTypeSelect.innerHTML = '<option value="">All</option>';
+        accountTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            accountTypeSelect.appendChild(option);
+        });
+        
+        // Populate resource type dropdown
+        const resourceTypeSelect = document.getElementById('filter-resource-type');
+        resourceTypeSelect.innerHTML = '<option value="">All</option>';
+        resourceTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            resourceTypeSelect.appendChild(option);
+        });
+    }
+    
     function togglePassword(credId) {
         const element = document.getElementById(`pwd-${credId}`);
         element.classList.toggle('password-hidden');
@@ -491,15 +592,62 @@
         }, 2000);
     }
     
-    function filterCredentials() {
+    function applyFilters() {
+        // Get all filter values
         const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        const hostnameFilter = document.getElementById('filter-hostname').value.toLowerCase();
+        const usernameFilter = document.getElementById('filter-username').value.toLowerCase();
+        const credentialTypeFilter = document.getElementById('filter-credential-type').value;
+        const accountTypeFilter = document.getElementById('filter-account-type').value;
+        const resourceTypeFilter = document.getElementById('filter-resource-type').value;
+        const domainFilter = document.getElementById('filter-domain').value.toLowerCase();
+        const sourceFilter = document.getElementById('filter-source').value;
+        
+        // Apply all filters
         const filtered = credentials.filter(cred => {
-            return (cred.hostname || '').toLowerCase().includes(searchTerm) ||
-                   (cred.username || '').toLowerCase().includes(searchTerm) ||
-                   (cred.resource_type || '').toLowerCase().includes(searchTerm) ||
-                   (cred.domain_name || '').toLowerCase().includes(searchTerm);
+            // Search filter (searches across multiple fields)
+            const matchesSearch = !searchTerm || 
+                (cred.hostname || '').toLowerCase().includes(searchTerm) ||
+                (cred.username || '').toLowerCase().includes(searchTerm) ||
+                (cred.resource_type || '').toLowerCase().includes(searchTerm) ||
+                (cred.domain_name || '').toLowerCase().includes(searchTerm);
+            
+            // Column filters
+            const matchesHostname = !hostnameFilter || (cred.hostname || '').toLowerCase().includes(hostnameFilter);
+            const matchesUsername = !usernameFilter || (cred.username || '').toLowerCase().includes(usernameFilter);
+            const matchesCredentialType = !credentialTypeFilter || cred.credential_type === credentialTypeFilter;
+            const matchesAccountType = !accountTypeFilter || cred.account_type === accountTypeFilter;
+            const matchesResourceType = !resourceTypeFilter || cred.resource_type === resourceTypeFilter;
+            const matchesDomain = !domainFilter || (cred.domain_name || '').toLowerCase().includes(domainFilter);
+            const matchesSource = !sourceFilter || cred.source === sourceFilter;
+            
+            return matchesSearch && matchesHostname && matchesUsername && 
+                   matchesCredentialType && matchesAccountType && matchesResourceType && 
+                   matchesDomain && matchesSource;
         });
+        
         renderCredentials(filtered);
+        
+        // Update table display message if no results
+        if (filtered.length === 0 && credentials.length > 0) {
+            const tbody = document.getElementById('credentials-tbody');
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #666;">No credentials match the current filters</td></tr>';
+        }
+    }
+    
+    function clearFilters() {
+        // Clear all filter inputs
+        document.getElementById('search-input').value = '';
+        document.getElementById('filter-hostname').value = '';
+        document.getElementById('filter-username').value = '';
+        document.getElementById('filter-credential-type').value = '';
+        document.getElementById('filter-account-type').value = '';
+        document.getElementById('filter-resource-type').value = '';
+        document.getElementById('filter-domain').value = '';
+        document.getElementById('filter-source').value = '';
+        
+        // Re-render all credentials
+        renderCredentials(credentials);
     }
     
     async function syncCredentials() {

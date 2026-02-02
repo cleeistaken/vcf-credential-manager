@@ -161,8 +161,10 @@ def fetch_credentials_for_environment(env_id):
             app.logger.debug(f"Updating database with {len(credentials)} credentials")
             
             # Get existing credentials for comparison
+            # Use a composite key to uniquely identify credentials:
+            # hostname + username + credential_type + resource_type
             existing_creds = {
-                (c.hostname, c.username): c 
+                (c.hostname, c.username, c.credential_type, c.resource_type): c 
                 for c in Credential.query.filter_by(environment_id=env_id).all()
             }
             
@@ -175,7 +177,11 @@ def fetch_credentials_for_environment(env_id):
                 hostname = cred_data.get('hostname', cred_data.get('resourceName', ''))
                 username = cred_data.get('username', '')
                 new_password = cred_data.get('password', '')
-                key = (hostname, username)
+                credential_type = cred_data.get('credentialType', 'USER')
+                resource_type = cred_data.get('resourceType', '')
+                
+                # Create composite key for unique identification
+                key = (hostname, username, credential_type, resource_type)
                 
                 if key in existing_creds:
                     # Update existing credential
