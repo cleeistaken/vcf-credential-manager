@@ -59,6 +59,16 @@
             gap: 1rem;
         }
         
+        .badge-readonly {
+            background-color: #666;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
         /* Content */
         .content-container {
             padding: 2rem;
@@ -114,6 +124,17 @@
         .alert-info::before {
             content: "ℹ";
             color: #0072a3;
+        }
+        
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+        
+        .alert-warning::before {
+            content: "⚠";
+            color: #ffc107;
         }
         
         /* Buttons */
@@ -515,8 +536,14 @@
             </div>
             <div class="header-actions">
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                {% if current_user.is_admin or current_user.role == 'admin' %}
+                <a href="{{ url_for('settings') }}">⚙️ Settings</a>
+                {% endif %}
                 <span style="color: #ccc;">|</span>
                 <span>{{ current_user.username }}</span>
+                {% if current_user.role == 'readonly' %}
+                <span class="badge-readonly">Read-Only</span>
+                {% endif %}
                 <a href="{{ url_for('change_password') }}">🔒 Change Password</a>
                 <a href="{{ url_for('logout') }}">Logout</a>
             </div>

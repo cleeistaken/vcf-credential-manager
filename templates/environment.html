@@ -16,9 +16,11 @@
         </div>
         
         <div class="header-actions">
+            {% if current_user.role != 'readonly' %}
             <button class="btn btn-sm btn-outline" onclick="syncCredentials()">
                 🔄 Sync Now
             </button>
+            {% endif %}
             <button class="btn btn-sm btn-success-outline" onclick="exportCSV()">
                 📄 Export CSV
             </button>

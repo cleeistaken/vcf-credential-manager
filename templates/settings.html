@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+                ← Back to Dashboard
+            </a>
+            <h1>Settings</h1>
+            <p class="p6">Manage system settings, users, and SSL certificates</p>
+        </div>
+    </div>
+    
+    <!-- User Management Section -->
+    <div class="settings-section">
+        <h2>👥 User Management</h2>
+        <p class="section-description">Manage user accounts and permissions</p>
+        
+        <div class="card">
+            <h3>Add New User</h3>
+            <form method="POST" action="{{ url_for('add_user') }}" class="user-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" class="clr-input" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="clr-input" required minlength="8">
+                    <span class="form-hint">Minimum 8 characters</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Role</label>
+                    <select id="role" name="role" class="clr-select" required>
+                        <option value="admin">Admin (Full Access)</option>
+                        <option value="readonly">Read-Only (View Only)</option>
+                    </select>
+                    <span class="form-hint">
+                        <strong>Admin:</strong> Can manage environments, sync credentials, and modify settings<br>
+                        <strong>Read-Only:</strong> Can only view credentials and environment information
+                    </span>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">➕ Add User</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h3>Existing Users</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            {{ user.username }}
+                            {% if user.id == current_user.id %}
+                            <span class="badge badge-info">You</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.role == 'admin' or user.is_admin %}
+                            <span class="badge badge-success">Admin</span>
+                            {% else %}
+                            <span class="badge badge-secondary">Read-Only</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                        <td>
+                            {% if user.id != current_user.id %}
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                🗑️ Delete
+                            </button>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- SSL Certificate Management Section -->
+    <div class="settings-section">
+        <h2>🔒 SSL Certificate Management</h2>
+        <p class="section-description">Upload and update SSL certificates for HTTPS</p>
+        
+        <div class="card">
+            <h3>Upload SSL Certificates</h3>
+            <form method="POST" action="{{ url_for('upload_ssl_certificates') }}" enctype="multipart/form-data" class="ssl-form">
+                <div class="alert alert-info">
+                    <strong>⚠️ Important:</strong> The server must be restarted after uploading new certificates for changes to take effect.
+                </div>
+                
+                <div class="form-group">
+                    <label for="cert_file">Certificate File (.crt or .pem)</label>
+                    <input type="file" id="cert_file" name="cert_file" accept=".crt,.pem" required>
+                    <span class="form-hint">Upload your SSL certificate file</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="key_file">Private Key File (.key or .pem)</label>
+                    <input type="file" id="key_file" name="key_file" accept=".key,.pem" required>
+                    <span class="form-hint">Upload your private key file</span>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <strong>Validation:</strong> Certificates will be validated before being saved. The system will verify:
+                    <ul>
+                        <li>Certificate is valid and properly formatted</li>
+                        <li>Private key is valid and properly formatted</li>
+                        <li>Certificate and private key match</li>
+                    </ul>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">📤 Upload Certificates</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h3>Current Certificate Information</h3>
+            <div id="cert-info">
+                <p class="text-muted">Loading certificate information...</p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>Restart Server</h3>
+            <p>Restart the Gunicorn server to apply new SSL certificates or configuration changes.</p>
+            
+            <div class="alert alert-warning">
+                <strong>⚠ Warning:</strong> Restarting the server will:
+                <ul>
+                    <li>Disconnect all active users (they will need to log in again)</li>
+                    <li>Reload SSL certificates</li>
+                    <li>Apply any configuration changes</li>
+                    <li>Take approximately 5-10 seconds</li>
+                </ul>
+            </div>
+            
+            <button class="btn btn-danger" onclick="restartServer()">
+                🔄 Restart Server
+            </button>
+            
+            <div id="restart-status" style="display: none; margin-top: 1rem;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        margin-bottom: 2rem;
+    }
+    
+    .page-header h1 {
+        margin: 0.5rem 0;
+    }
+    
+    .settings-section {
+        margin-bottom: 3rem;
+    }
+    
+    .settings-section h2 {
+        margin-bottom: 0.5rem;
+        color: #0072a3;
+    }
+    
+    .section-description {
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+    
+    .card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .card h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="password"],
+    .form-group select {
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .form-group input[type="file"] {
+        display: block;
+        margin-top: 0.5rem;
+    }
+    
+    .form-hint {
+        display: block;
+        font-size: 0.875rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    .user-form,
+    .ssl-form {
+        max-width: 600px;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .badge-success {
+        background-color: #60b515;
+        color: white;
+    }
+    
+    .badge-secondary {
+        background-color: #666;
+        color: white;
+    }
+    
+    .badge-info {
+        background-color: #0072a3;
+        color: white;
+    }
+    
+    .alert {
+        padding: 1rem !important;
+        padding-left: 1rem !important;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+    
+    /* Remove the icon from alerts on this page */
+    .alert::before {
+        display: none !important;
+        content: "" !important;
+    }
+    
+    .alert-info {
+        background-color: #e1f5fe;
+        border-left: 4px solid #0072a3;
+        color: #01579b;
+    }
+    
+    .alert-warning {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        color: #856404;
+    }
+    
+    .alert ul {
+        margin: 0.5rem 0 0 1.5rem;
+    }
+    
+    .text-muted {
+        color: #666;
+    }
+    
+    .btn-danger {
+        background-color: #c92100 !important;
+        color: white !important;
+        border: 1px solid #c92100 !important;
+        font-weight: bold !important;
+    }
+    
+    .btn-danger:hover {
+        background-color: #a01a00 !important;
+        border-color: #a01a00 !important;
+        color: white !important;
+    }
+    
+    /* Ensure button text is white */
+    button.btn-danger {
+        color: white !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function deleteUser(userId, username) {
+        if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/settings/users/${userId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                alert(`User "${username}" deleted successfully`);
+                location.reload();
+            } else {
+                const data = await response.json();
+                alert(`Failed to delete user: ${data.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('Failed to delete user');
+        }
+    }
+    
+    // Load current certificate information
+    async function loadCertInfo() {
+        try {
+            const response = await fetch('/api/ssl-info');
+            if (response.ok) {
+                const data = await response.json();
+                const certInfo = document.getElementById('cert-info');
+                
+                if (data.exists) {
+                    certInfo.innerHTML = `
+                        <table class="table">
+                            <tr>
+                                <th>Subject:</th>
+                                <td>${data.subject || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Issuer:</th>
+                                <td>${data.issuer || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Valid From:</th>
+                                <td>${data.valid_from || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Valid Until:</th>
+                                <td>${data.valid_until || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Days Remaining:</th>
+                                <td>${data.days_remaining || 'N/A'}</td>
+                            </tr>
+                        </table>
+                    `;
+                } else {
+                    certInfo.innerHTML = '<p class="text-muted">No SSL certificate found. Using default self-signed certificate.</p>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading certificate info:', error);
+            document.getElementById('cert-info').innerHTML = '<p class="text-muted">Unable to load certificate information</p>';
+        }
+    }
+    
+    // Load cert info on page load
+    document.addEventListener('DOMContentLoaded', loadCertInfo);
+    
+    // Restart server
+    async function restartServer() {
+        if (!confirm('Are you sure you want to restart the server?\n\nAll users will be disconnected and need to log in again.\n\nThis will take approximately 5-10 seconds.')) {
+            return;
+        }
+        
+        const statusDiv = document.getElementById('restart-status');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'alert alert-info';
+        statusDiv.innerHTML = '🔄 Restarting server... Please wait...';
+        
+        try {
+            const response = await fetch('/api/restart-server', {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                statusDiv.className = 'alert alert-success';
+                statusDiv.innerHTML = '✓ Server restart initiated. You will be redirected to the login page in 5 seconds...';
+                
+                // Wait 5 seconds then redirect to login
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 5000);
+            } else {
+                const data = await response.json();
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.innerHTML = `✕ Failed to restart server: ${data.error || 'Unknown error'}`;
+            }
+        } catch (error) {
+            console.error('Error restarting server:', error);
+            statusDiv.className = 'alert alert-danger';
+            statusDiv.innerHTML = '✕ Failed to restart server. Please try again or restart manually.';
+        }
+    }
+</script>
+{% endblock %}

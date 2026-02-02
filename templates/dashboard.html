@@ -8,9 +8,15 @@
     <p class="p6">Manage your VCF environments and credentials</p>
     
     <div style="margin: 1rem 0;">
+        {% if current_user.role != 'readonly' %}
         <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
             ➕ Add Environment
         </button>
+        {% else %}
+        <div class="alert alert-info">
+            You are logged in as a read-only user. You can view credentials but cannot modify environments.
+        </div>
+        {% endif %}
     </div>
     
     <div class="clr-row" id="environments-grid">
@@ -61,6 +67,7 @@
                     <button class="btn btn-sm btn-link" onclick="viewEnvironment({{ env.id }})">
                         👁️ View Credentials
                     </button>
+                    {% if current_user.role != 'readonly' %}
                     <button class="btn btn-sm btn-link" onclick="syncEnvironment({{ env.id }})">
                         🔄 Sync Now
                     </button>
@@ -70,6 +77,7 @@
                     <button class="btn btn-sm btn-link btn-danger" onclick="deleteEnvironment({{ env.id }}, '{{ env.name }}')">
                         🗑️ Delete
                     </button>
+                    {% endif %}
                 </div>
             </div>
         </div>

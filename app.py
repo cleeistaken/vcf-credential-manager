@@ -9,11 +9,13 @@ import sys
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import logging
 from logging.handlers import RotatingFileHandler
-from datetime import datetime
+from datetime import datetime, timezone
 import io
 
 from web.models import db, User, Environment, Credential, PasswordHistory, ScheduleConfig
@@ -101,6 +103,7 @@ db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.login_message_category = 'warning'  # Use warning style for login required message
 
 # Initialize scheduler
 scheduler = BackgroundScheduler()
@@ -110,14 +113,34 @@ app.logger.info("Background scheduler started")
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
+
+
+def admin_required(f):
+    """Decorator to require admin role"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+        if not current_user.is_admin and current_user.role != 'admin':
+            flash('Access denied. Admin privileges required.', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def check_readonly():
+    """Check if current user is readonly and return error if trying to modify"""
+    if current_user.role == 'readonly':
+        return jsonify({'error': 'Read-only users cannot modify data'}), 403
+    return None
 
 
 def fetch_credentials_for_environment(env_id):
     """Background task to fetch credentials for an environment"""
     with app.app_context():
         try:
-            environment = Environment.query.get(env_id)
+            environment = db.session.get(Environment, env_id)
             if not environment:
                 app.logger.error(f"Environment {env_id} not found")
                 return
@@ -193,7 +216,7 @@ def fetch_credentials_for_environment(env_id):
                         history_entry = PasswordHistory(
                             credential_id=existing_cred.id,
                             password=existing_cred.password,
-                            changed_at=existing_cred.last_updated or datetime.utcnow(),
+                            changed_at=existing_cred.last_updated or datetime.now(timezone.utc),
                             changed_by='SYNC'
                         )
                         db.session.add(history_entry)
@@ -207,7 +230,7 @@ def fetch_credentials_for_environment(env_id):
                     existing_cred.resource_type = cred_data.get('resourceType', '')
                     existing_cred.domain_name = cred_data.get('domainName', '')
                     existing_cred.source = cred_data.get('source', 'SDDC_MANAGER')
-                    existing_cred.last_updated = datetime.utcnow()
+                    existing_cred.last_updated = datetime.now(timezone.utc)
                     updated_count += 1
                     
                     # Remove from dict so we know it still exists
@@ -224,7 +247,7 @@ def fetch_credentials_for_environment(env_id):
                         resource_type=cred_data.get('resourceType', ''),
                         domain_name=cred_data.get('domainName', ''),
                         source=cred_data.get('source', 'SDDC_MANAGER'),
-                        last_updated=datetime.utcnow()
+                        last_updated=datetime.now(timezone.utc)
                     )
                     db.session.add(new_cred)
                     new_count += 1
@@ -235,7 +258,7 @@ def fetch_credentials_for_environment(env_id):
                 db.session.delete(old_cred)
                 removed_count += 1
             
-            environment.last_sync = datetime.utcnow()
+            environment.last_sync = datetime.now(timezone.utc)
             db.session.commit()
             
             app.logger.info(
@@ -281,7 +304,8 @@ def init_database():
                 admin = User(
                     username='admin',
                     password_hash=generate_password_hash('admin'),
-                    is_admin=True
+                    is_admin=True,
+                    role='admin'
                 )
                 db.session.add(admin)
                 db.session.commit()
@@ -384,6 +408,196 @@ def change_password():
     return render_template('change_password.html')
 
 
+@app.route('/settings')
+@login_required
+@admin_required
+def settings():
+    """Settings page - admin only"""
+    users = User.query.all()
+    return render_template('settings.html', users=users)
+
+
+@app.route('/settings/users', methods=['POST'])
+@login_required
+@admin_required
+def add_user():
+    """Add a new user"""
+    try:
+        username = request.form.get('username')
+        password = request.form.get('password')
+        role = request.form.get('role', 'readonly')
+        
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return redirect(url_for('settings'))
+        
+        # Check if user already exists
+        if User.query.filter_by(username=username).first():
+            flash(f'User {username} already exists', 'error')
+            return redirect(url_for('settings'))
+        
+        # Validate password length
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long', 'error')
+            return redirect(url_for('settings'))
+        
+        # Create new user
+        new_user = User(
+            username=username,
+            password_hash=generate_password_hash(password),
+            is_admin=(role == 'admin'),
+            role=role
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        
+        app.logger.info(f"New user created: {username} (role: {role})")
+        flash(f'User {username} created successfully', 'success')
+        
+    except Exception as e:
+        app.logger.error(f"Error creating user: {e}", exc_info=True)
+        flash('Failed to create user', 'error')
+        db.session.rollback()
+    
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    """Delete a user"""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Prevent deleting yourself
+        if user.id == current_user.id:
+            return jsonify({'error': 'Cannot delete your own account'}), 400
+        
+        # Prevent deleting the last admin
+        if user.is_admin or user.role == 'admin':
+            admin_count = User.query.filter(
+                (User.is_admin == True) | (User.role == 'admin')
+            ).count()
+            if admin_count <= 1:
+                return jsonify({'error': 'Cannot delete the last admin user'}), 400
+        
+        username = user.username
+        db.session.delete(user)
+        db.session.commit()
+        
+        app.logger.info(f"User deleted: {username}")
+        return jsonify({'message': f'User {username} deleted successfully'})
+        
+    except Exception as e:
+        app.logger.error(f"Error deleting user: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete user'}), 500
+
+
+@app.route('/settings/ssl', methods=['POST'])
+@login_required
+@admin_required
+def upload_ssl_certificates():
+    """Upload and validate SSL certificates"""
+    try:
+        import ssl
+        import tempfile
+        import subprocess
+        
+        cert_file = request.files.get('cert_file')
+        key_file = request.files.get('key_file')
+        
+        if not cert_file or not key_file:
+            flash('Both certificate and key files are required', 'error')
+            return redirect(url_for('settings'))
+        
+        # Save files temporarily for validation
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.crt') as cert_tmp:
+            cert_file.save(cert_tmp.name)
+            cert_path = cert_tmp.name
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.key') as key_tmp:
+            key_file.save(key_tmp.name)
+            key_path = key_tmp.name
+        
+        try:
+            # Validate certificate
+            result = subprocess.run(
+                ['openssl', 'x509', '-in', cert_path, '-noout', '-text'],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                flash('Invalid certificate file', 'error')
+                return redirect(url_for('settings'))
+            
+            # Validate private key
+            result = subprocess.run(
+                ['openssl', 'rsa', '-in', key_path, '-check', '-noout'],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                flash('Invalid private key file', 'error')
+                return redirect(url_for('settings'))
+            
+            # Verify certificate and key match
+            cert_modulus = subprocess.run(
+                ['openssl', 'x509', '-noout', '-modulus', '-in', cert_path],
+                capture_output=True,
+                text=True
+            ).stdout.strip()
+            
+            key_modulus = subprocess.run(
+                ['openssl', 'rsa', '-noout', '-modulus', '-in', key_path],
+                capture_output=True,
+                text=True
+            ).stdout.strip()
+            
+            if cert_modulus != key_modulus:
+                flash('Certificate and private key do not match', 'error')
+                return redirect(url_for('settings'))
+            
+            # Create ssl directory if it doesn't exist
+            ssl_dir = os.path.join(os.getcwd(), 'ssl')
+            os.makedirs(ssl_dir, exist_ok=True)
+            
+            # Backup existing certificates
+            cert_dest = os.path.join(ssl_dir, 'server.crt')
+            key_dest = os.path.join(ssl_dir, 'server.key')
+            
+            if os.path.exists(cert_dest):
+                os.rename(cert_dest, cert_dest + '.backup')
+            if os.path.exists(key_dest):
+                os.rename(key_dest, key_dest + '.backup')
+            
+            # Copy new certificates
+            import shutil
+            shutil.copy2(cert_path, cert_dest)
+            shutil.copy2(key_path, key_dest)
+            
+            # Set proper permissions
+            os.chmod(cert_dest, 0o644)
+            os.chmod(key_dest, 0o600)
+            
+            app.logger.info("SSL certificates updated successfully")
+            flash('SSL certificates updated successfully. Please restart the server for changes to take effect.', 'success')
+            
+        finally:
+            # Clean up temporary files
+            os.unlink(cert_path)
+            os.unlink(key_path)
+            
+    except Exception as e:
+        app.logger.error(f"Error uploading SSL certificates: {e}", exc_info=True)
+        flash('Failed to upload SSL certificates', 'error')
+    
+    return redirect(url_for('settings'))
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -409,6 +623,11 @@ def api_environments():
         } for env in environments])
     
     elif request.method == 'POST':
+        # Check if user is readonly
+        readonly_check = check_readonly()
+        if readonly_check:
+            return readonly_check
+        
         data = request.json
         
         app.logger.info(f"Creating new environment: {data.get('name')}")
@@ -465,6 +684,11 @@ def api_environment(env_id):
         })
     
     elif request.method == 'PUT':
+        # Check if user is readonly
+        readonly_check = check_readonly()
+        if readonly_check:
+            return readonly_check
+        
         data = request.json
         
         environment.name = data.get('name', environment.name)
@@ -491,6 +715,11 @@ def api_environment(env_id):
         return jsonify({'message': 'Environment updated successfully'})
     
     elif request.method == 'DELETE':
+        # Check if user is readonly
+        readonly_check = check_readonly()
+        if readonly_check:
+            return readonly_check
+        
         app.logger.info(f"Deleting environment: {environment.name} (ID: {env_id})")
         
         # Remove scheduled job
@@ -517,6 +746,11 @@ def api_environment(env_id):
 @login_required
 def api_sync_environment(env_id):
     """Manually trigger credential sync for an environment"""
+    # Check if user is readonly
+    readonly_check = check_readonly()
+    if readonly_check:
+        return readonly_check
+    
     environment = Environment.query.get_or_404(env_id)
     
     app.logger.info(f"Manual sync triggered for environment: {environment.name} (ID: {env_id})")
@@ -683,6 +917,176 @@ def environment_view(env_id):
     """View credentials for a specific environment"""
     environment = Environment.query.get_or_404(env_id)
     return render_template('environment.html', environment=environment)
+
+
+@app.route('/api/ssl-info')
+@login_required
+@admin_required
+def api_ssl_info():
+    """Get current SSL certificate information"""
+    try:
+        import subprocess
+        
+        ssl_dir = os.path.join(os.getcwd(), 'ssl')
+        cert_path = os.path.join(ssl_dir, 'server.crt')
+        
+        if not os.path.exists(cert_path):
+            return jsonify({'exists': False})
+        
+        # Get certificate information
+        result = subprocess.run(
+            ['openssl', 'x509', '-in', cert_path, '-noout', '-subject', '-issuer', '-dates'],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            return jsonify({'exists': False})
+        
+        # Parse output
+        info = {}
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith('subject='):
+                info['subject'] = line.replace('subject=', '').strip()
+            elif line.startswith('issuer='):
+                info['issuer'] = line.replace('issuer=', '').strip()
+            elif line.startswith('notBefore='):
+                info['valid_from'] = line.replace('notBefore=', '').strip()
+            elif line.startswith('notAfter='):
+                info['valid_until'] = line.replace('notAfter=', '').strip()
+        
+        # Calculate days remaining
+        try:
+            from datetime import datetime
+            valid_until_str = info.get('valid_until', '')
+            if valid_until_str:
+                valid_until = datetime.strptime(valid_until_str, '%b %d %H:%M:%S %Y %Z')
+                days_remaining = (valid_until - datetime.now()).days
+                info['days_remaining'] = days_remaining
+        except:
+            info['days_remaining'] = 'N/A'
+        
+        info['exists'] = True
+        return jsonify(info)
+        
+    except Exception as e:
+        app.logger.error(f"Error getting SSL info: {e}", exc_info=True)
+        return jsonify({'exists': False, 'error': str(e)})
+
+
+@app.route('/api/restart-server', methods=['POST'])
+@login_required
+@admin_required
+def api_restart_server():
+    """Restart the Gunicorn server"""
+    try:
+        import signal
+        
+        app.logger.warning(f"Server restart initiated by user: {current_user.username}")
+        
+        # Get the current process ID
+        current_pid = os.getpid()
+        app.logger.debug(f"Current process PID: {current_pid}")
+        
+        # Method 1: Check for PID file (most reliable)
+        pid_file = 'gunicorn.pid'
+        gunicorn_pid = None
+        
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, 'r') as f:
+                    gunicorn_pid = int(f.read().strip())
+                app.logger.info(f"Found Gunicorn PID from file: {gunicorn_pid}")
+            except Exception as e:
+                app.logger.debug(f"Could not read PID file: {e}")
+        
+        # Method 2: Check environment variable set by Gunicorn
+        if not gunicorn_pid:
+            # Check if we're running under Gunicorn by looking at parent process
+            try:
+                parent_pid = os.getppid()
+                app.logger.debug(f"Parent process PID: {parent_pid}")
+                
+                # Try to read parent's process name from /proc (Linux) or use psutil
+                try:
+                    # Try Linux /proc filesystem
+                    with open(f'/proc/{parent_pid}/comm', 'r') as f:
+                        parent_name = f.read().strip()
+                        if 'gunicorn' in parent_name.lower():
+                            gunicorn_pid = parent_pid
+                            app.logger.info(f"Found Gunicorn master via /proc: {gunicorn_pid}")
+                except:
+                    # /proc not available (macOS), try psutil if available
+                    try:
+                        import psutil
+                        parent = psutil.Process(parent_pid)
+                        if 'gunicorn' in parent.name().lower():
+                            gunicorn_pid = parent_pid
+                            app.logger.info(f"Found Gunicorn master via psutil: {gunicorn_pid}")
+                    except ImportError:
+                        app.logger.debug("psutil not available")
+                    except Exception as e:
+                        app.logger.debug(f"psutil check failed: {e}")
+            except Exception as e:
+                app.logger.debug(f"Parent process check failed: {e}")
+        
+        # Method 3: Use os.getppid() and assume parent is Gunicorn master
+        if not gunicorn_pid:
+            try:
+                # If we're a Gunicorn worker, parent should be master
+                # Check if SERVER_SOFTWARE or other Gunicorn indicators exist
+                if 'gunicorn' in os.environ.get('SERVER_SOFTWARE', '').lower():
+                    gunicorn_pid = os.getppid()
+                    app.logger.info(f"Found Gunicorn master via SERVER_SOFTWARE: {gunicorn_pid}")
+            except Exception as e:
+                app.logger.debug(f"SERVER_SOFTWARE check failed: {e}")
+        
+        # Method 4: Last resort - try to signal parent and see if it works
+        if not gunicorn_pid:
+            try:
+                parent_pid = os.getppid()
+                # Try to send signal 0 (doesn't actually signal, just checks if process exists)
+                os.kill(parent_pid, 0)
+                # If we got here, parent exists - assume it's Gunicorn
+                gunicorn_pid = parent_pid
+                app.logger.info(f"Assuming parent is Gunicorn master: {gunicorn_pid}")
+            except Exception as e:
+                app.logger.debug(f"Parent signal test failed: {e}")
+        
+        # If we found a Gunicorn PID, send SIGHUP
+        if gunicorn_pid:
+            try:
+                os.kill(gunicorn_pid, signal.SIGHUP)
+                app.logger.info(f"Sent SIGHUP to Gunicorn process {gunicorn_pid}")
+                return jsonify({
+                    'message': 'Server restart initiated successfully',
+                    'note': 'Please log in again after restart'
+                })
+            except ProcessLookupError:
+                app.logger.error(f"Gunicorn process {gunicorn_pid} not found")
+                return jsonify({
+                    'error': 'Gunicorn process not found',
+                    'note': 'Please restart manually: ./start_https.sh'
+                }), 500
+            except PermissionError:
+                app.logger.error(f"Permission denied to signal process {gunicorn_pid}")
+                return jsonify({
+                    'error': 'Permission denied to restart server',
+                    'note': 'Please restart manually: ./start_https.sh'
+                }), 500
+        else:
+            # Not running under Gunicorn
+            app.logger.warning("Not running under Gunicorn, cannot perform graceful restart")
+            app.logger.debug(f"Environment: SERVER_SOFTWARE={os.environ.get('SERVER_SOFTWARE', 'not set')}")
+            app.logger.debug(f"Parent PID: {os.getppid()}")
+            return jsonify({
+                'error': 'Server restart is only available when running under Gunicorn',
+                'note': 'Please restart manually: ./start_https.sh'
+            }), 400
+                
+    except Exception as e:
+        app.logger.error(f"Error restarting server: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to restart server', 'details': str(e)}), 500
 
 
 @app.cli.command()

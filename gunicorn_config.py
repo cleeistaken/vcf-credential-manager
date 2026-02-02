@@ -29,7 +29,7 @@ proc_name = 'vcf_credentials_manager'
 
 # Server mechanics
 daemon = False
-pidfile = None
+pidfile = 'gunicorn.pid'  # Store PID for restart functionality
 umask = 0
 user = None
 group = None

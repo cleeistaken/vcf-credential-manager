@@ -318,15 +318,18 @@ pkill gunicorn
 
 Comprehensive documentation available in the `docs/` directory:
 
-- **[START_HERE.md](docs/START_HERE.md)** - Overview and getting started
-- **[QUICKSTART.md](docs/QUICKSTART.md)** - Quick setup guide
-- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Production deployment guide
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
-- **[GUNICORN_GUIDE.md](docs/GUNICORN_GUIDE.md)** - Gunicorn deployment
-- **[NEW_FEATURES.md](docs/NEW_FEATURES.md)** - Feature documentation
-- **[UI_IMPROVEMENTS.md](docs/UI_IMPROVEMENTS.md)** - UI enhancements
-- **[PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** - File organization
-- **[CHANGELOG.md](docs/CHANGELOG.md)** - Version history
+### Getting Started
+- **[Quick Start Guide](docs/QUICKSTART.md)** - Installation and setup
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+### Features
+- **[Settings & User Management](docs/SETTINGS_AND_USER_MANAGEMENT.md)** - User roles and SSL certificates
+- **[Password History](docs/PASSWORD_HISTORY.md)** - Track password changes
+- **[Column Filters](docs/COLUMN_FILTERS.md)** - Advanced credential filtering
+- **[Server Restart](docs/SERVER_RESTART_FEATURE.md)** - Graceful server restart
+
+See **[docs/README.md](docs/README.md)** for complete documentation index.
 
 ## 🔄 Scheduled Syncing
 
