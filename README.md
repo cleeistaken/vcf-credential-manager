@@ -1,443 +1,91 @@
 # VCF Credentials Manager
 
-A modern web application for managing VMware Cloud Foundation (VCF) credentials with automatic syncing and export capabilities.
+A web application for managing VMware Cloud Foundation (VCF) credentials with automatic syncing and export capabilities.
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
 # Run the application
-python app.py
+./start_https.sh
 
-# Access at http://localhost:5000
+# Access at https://localhost:5000
 # Default login: admin / admin
 ```
 
-## 📋 Features
+**Change the default password immediately after first login.**
 
-- 🔐 **Secure Authentication** - User login with password management
-- 🌐 **Multi-Environment Support** - Manage multiple VCF environments
-- ⏰ **Scheduled Syncing** - Automatic credential retrieval at configurable intervals
-- 📊 **Export Options** - Export credentials to CSV or Excel
-- 🧪 **Connection Testing** - Validate credentials before saving
-- 📝 **Comprehensive Logging** - Track all operations
-- 🔒 **SSL Support** - HTTPS with custom certificates
-- 🎨 **Modern UI** - Clean, responsive interface
-- 🔄 **Manual Sync** - On-demand credential refresh
-- 🗑️ **Safe Deletion** - Confirmation prompts to prevent accidents
+## Features
 
-## 📁 Project Structure
+- **Multi-Environment Support** - Manage multiple VCF environments
+- **Scheduled Syncing** - Automatic credential retrieval at configurable intervals
+- **Export Options** - Export credentials to CSV or Excel
+- **Connection Testing** - Validate credentials before saving
+- **Password History** - Track password changes over time
+- **Column Filters** - Filter credentials by multiple criteria
+- **User Management** - Admin and read-only user roles
+- **SSL Support** - HTTPS with custom certificates
 
-```
-vcf-credentials-fetch/
-├── web/                   # Web Application
-│   ├── models/           # Database models
-│   │   └── database.py   # SQLAlchemy models (User, Environment, Credential)
-│   └── services/         # Web services
-│       ├── vcf_fetcher.py    # VCF API client
-│       └── export_utils.py   # Export utilities
-├── templates/            # HTML templates
-│   ├── base.html
-│   ├── login.html
-│   ├── dashboard.html
-│   ├── environment.html
-│   └── change_password.html
-├── static/               # CSS, JavaScript
-│   ├── css/
-│   │   └── custom.css
-│   └── js/
-│       └── dashboard.js
-├── docs/                 # Documentation
-├── logs/                 # Application logs
-├── instance/             # SQLite database
-├── ssl/                  # SSL certificates (optional)
-├── app.py               # Main application entry point
-├── gunicorn_config.py   # Gunicorn configuration
-├── start_https.sh       # Startup script
-└── requirements.txt      # Python dependencies
-```
+## Usage
 
-## 🔧 Installation
+### Add Environment
 
-### Requirements
-- Python 3.13+
-- pip or pipenv
+1. Click "Add Environment"
+2. Enter VCF Installer and/or SDDC Manager details
+3. Configure sync interval (optional)
+4. Test connection and save
 
-### Install Dependencies
+### Sync Credentials
 
-**Using pip:**
-```bash
-pip install -r requirements.txt
-```
+- **Automatic**: Credentials sync at configured intervals
+- **Manual**: Click "Sync Now" on any environment
 
-**Using pipenv:**
-```bash
-pipenv install
-pipenv shell
-```
+### Export Credentials
 
-## 🌐 Usage
+1. Click "View" on any environment
+2. Click "Export to CSV" or "Export to Excel"
 
-### Development Server
-
-```bash
-python app.py
-```
-
-Access at `http://localhost:5000`
-
-Default credentials:
-- **Username:** admin
-- **Password:** admin
-
-⚠️ **Important:** Change the default password after first login!
-
-### Production Deployment
-
-#### HTTP (Development/Testing)
-
-```bash
-gunicorn --config gunicorn_config.py app:app
-```
-
-#### HTTPS (Production)
-
-**Recommended Method - Use the startup script:**
-```bash
-./start_https.sh
-```
-
-This script will:
-- Check for virtual environment activation
-- Create necessary directories (logs, ssl)
-- Generate self-signed SSL certificates if needed
-- Initialize the database on first run
-- Start Gunicorn with HTTPS support
-
-**Manual Method:**
-
-1. Generate SSL certificates:
-```bash
-mkdir -p ssl
-openssl req -x509 -newkey rsa:4096 -nodes \
-  -keyout ssl/key.pem -out ssl/cert.pem -days 365
-```
-
-2. Run with HTTPS:
-```bash
-gunicorn --config gunicorn_config.py --certfile ssl/cert.pem --keyfile ssl/key.pem app:app
-```
-
-**Important Notes:**
-- The application uses `preload_app = True` in Gunicorn config to ensure proper database initialization
-- On first startup, the database and default admin user are created automatically
-- Default credentials: admin / admin (change immediately after first login!)
-
-## 📖 How to Use
-
-### 1. Login
-- Navigate to `http://localhost:5000`
-- Login with default credentials (admin/admin)
-- Change password immediately via "Change Password" link
-
-### 2. Add Environment
-- Click "➕ Add Environment" button
-- Fill in environment details:
-  - **Name:** Descriptive name for the environment
-  - **Description:** Optional description
-  - **VCF Installer:** (Optional) Hostname, username, password, SSL verification
-  - **SDDC Manager:** (Optional) Hostname, username, password, SSL verification
-  - **Sync Settings:** Enable automatic sync and set interval (minutes)
-- Use "🧪 Test Connection" to validate credentials
-- Click "Save" to create environment
-
-### 3. View Credentials
-- Click "👁️ View" on any environment card
-- See all credentials in a table format
-- Export to CSV or Excel using the export buttons
-
-### 4. Sync Credentials
-- **Automatic:** Credentials sync at configured intervals
-- **Manual:** Click "🔄 Sync Now" on any environment card
-
-### 5. Edit Environment
-- Click "✏️ Edit" on any environment card
-- Update settings as needed
-- Test connection before saving
-
-### 6. Delete Environment
-- Click "🗑️ Delete" on any environment card
-- Type the environment name to confirm deletion
-- This prevents accidental deletions
-
-## 🔐 Security
-
-### Authentication
-- Passwords hashed with Werkzeug (PBKDF2-SHA256)
-- Session-based authentication with Flask-Login
-- Secure session cookies
-
-### HTTPS Support
-- Custom SSL certificates supported
-- Self-signed certificates for development
-- Production-grade SSL configuration
-
-### SSL Verification
-- Per-environment SSL verification settings
-- Separate settings for VCF Installer and SDDC Manager
-- Disable for self-signed certificates in lab environments
-
-### Best Practices
-
-```bash
-# Secure the database file
-chmod 600 instance/vcf_credentials.db
-
-# Use HTTPS in production
-./start_https.sh
-
-# Enable SSL verification for production systems
-# (in the web UI when adding environments)
-
-# Change default admin password immediately
-# Use "Change Password" link in the UI
-
-# Restrict network access
-# Use firewall rules to limit access to trusted IPs
-```
-
-## 🛠️ Configuration
+## Configuration
 
 ### Environment Variables
 
 ```bash
-# Flask configuration
-export FLASK_ENV=production
 export FLASK_SECRET_KEY=your-secret-key-here
 export FLASK_RUN_PORT=5000
-
-# Database location (optional)
-export DATABASE_URL=sqlite:///instance/vcf_credentials.db
 ```
 
-### Application Settings
+### SSL Certificates
 
-Edit `app.py` to customize:
-- Secret key (change for production!)
-- Database location
-- Session timeout
-- Logging configuration
+The startup script generates self-signed certificates automatically. For production, upload CA-signed certificates via Settings > SSL Certificate Management.
 
-## 📊 Logging
+## Logs
 
-Application logs are stored in the `logs/` directory:
+Logs are stored in the `logs/` directory:
+- `vcf_credentials.log` - Application logs
+- `vcf_credentials_errors.log` - Error logs
+- `gunicorn_access.log` - HTTP access logs
+- `gunicorn_error.log` - Gunicorn errors
 
-- **vcf_credentials.log** - General application logs
-- **vcf_credentials_errors.log** - Error logs only
-- **gunicorn_access.log** - HTTP access logs (when using Gunicorn)
-- **gunicorn_error.log** - Gunicorn error logs
+## Documentation
 
-Logs include:
-- User login/logout events
-- Environment operations (add, edit, delete)
-- Credential sync operations
-- API calls and errors
-- Connection test results
+See the `docs/` directory for detailed documentation:
 
-## 🐛 Troubleshooting
+- [Quick Start Guide](QUICKSTART.md) - Installation and first steps
+- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [User Management](docs/USER_MANAGEMENT.md) - Users, roles, and SSL certificates
+- [Features](docs/FEATURES.md) - Password history, filters, and more
 
-### Database Issues
+## Requirements
 
-**Problem:** Database errors on startup
+- Python 3.9+
+- Access to VCF Installer and/or SDDC Manager
 
-**Solution:**
-```bash
-# Remove old database (will lose data!)
-rm instance/vcf_credentials.db
+## Security
 
-# Restart application (creates new database)
-python app.py
-```
-
-### Port Already in Use
-
-**Problem:** Port 5000 already in use
-
-**Solution:**
-```bash
-# Use different port
-export FLASK_RUN_PORT=8000
-python app.py
-```
-
-### Connection Errors
-
-**Problem:** Cannot connect to VCF systems
-
-**Solutions:**
-- Verify hostname/IP is correct
-- Check username and password
-- Disable SSL verification for self-signed certificates
-- Use "🧪 Test Connection" button to diagnose
-- Check firewall rules
-- Review logs in `logs/vcf_credentials_errors.log`
-
-### SSL Certificate Errors
-
-**Problem:** SSL verification failures
-
-**Solutions:**
-```bash
-# For development, use self-signed certificates
-openssl req -x509 -newkey rsa:4096 -nodes \
-  -keyout ssl/key.pem -out ssl/cert.pem -days 365
-
-# Or disable SSL verification in environment settings
-# (not recommended for production)
-```
-
-### Gunicorn Issues
-
-**Problem:** Gunicorn won't start
-
-**Solution:**
-```bash
-# Check if already running
-ps aux | grep gunicorn
-
-# Kill existing processes
-pkill gunicorn
-
-# Restart
-./start_https.sh
-```
-
-## 📚 Documentation
-
-Comprehensive documentation available in the `docs/` directory:
-
-### Getting Started
-- **[Quick Start Guide](docs/QUICKSTART.md)** - Installation and setup
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-
-### Features
-- **[Settings & User Management](docs/SETTINGS_AND_USER_MANAGEMENT.md)** - User roles and SSL certificates
-- **[Password History](docs/PASSWORD_HISTORY.md)** - Track password changes
-- **[Column Filters](docs/COLUMN_FILTERS.md)** - Advanced credential filtering
-- **[Server Restart](docs/SERVER_RESTART_FEATURE.md)** - Graceful server restart
-
-See **[docs/README.md](docs/README.md)** for complete documentation index.
-
-## 🔄 Scheduled Syncing
-
-The application uses APScheduler for automatic credential syncing:
-
-- Each environment can have its own sync schedule
-- Sync intervals configured in minutes
-- Syncs run in the background
-- Last sync time displayed on environment cards
-- Manual sync available anytime
-
-### How It Works
-
-1. Enable sync when creating/editing an environment
-2. Set sync interval (e.g., 60 minutes)
-3. Application automatically fetches credentials at intervals
-4. Credentials stored in database
-5. View updated credentials anytime
-
-## 📤 Export Options
-
-### CSV Export
-- Simple comma-separated format
-- Compatible with Excel, Google Sheets
-- Includes all credential fields
-
-### Excel Export
-- Native .xlsx format
-- Formatted headers
-- Auto-sized columns
-- Professional appearance
-
-## 🤝 Contributing
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd vcf-credentials-fetch
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run development server
-python app.py
-```
-
-### Code Style
-- Follow PEP 8 guidelines
-- Use type hints where appropriate
-- Add docstrings to functions
-- Update documentation for new features
-
-## 🎯 Roadmap
-
-- [ ] Multi-user support with user management
-- [ ] Role-based access control (RBAC)
-- [ ] API endpoints for automation
-- [ ] Credential rotation capabilities
-- [ ] Audit logging with retention
-- [ ] Integration with secret managers (HashiCorp Vault, etc.)
-- [ ] Email notifications for sync failures
-- [ ] Dashboard with statistics and charts
-- [ ] Backup and restore functionality
-
-## 📝 License
-
-See LICENSE file for details.
-
-## 📞 Support
-
-### Getting Help
-
-1. Check the documentation in `docs/`
-2. Review troubleshooting section above
-3. Check application logs in `logs/`
-4. Verify configuration settings
-
-### Reporting Issues
-
-When reporting issues, include:
-- Python version
-- Operating system
-- Error messages from logs
-- Steps to reproduce
-- Expected vs actual behavior
-
-## ✨ Recent Updates
-
-### Version 2.3.0
-- Simplified to web-only application
-- Removed CLI interface
-- Streamlined documentation
-- Improved focus on web features
-
-### Version 2.1.0
-- Added password change functionality
-- Implemented connection testing
-- Enhanced logging system
-- Added delete confirmation prompts
-- Sorted environments alphabetically
-- Centered modals
-- Added installer toggle
-- Separate SSL verification settings
-
-See [CHANGELOG.md](docs/CHANGELOG.md) for complete version history.
-
----
-
-**Made with ❤️ for VMware Cloud Foundation administrators**
+- Change default admin password immediately
+- Use HTTPS in production
+- Restrict network access with firewall rules
+- Secure the database file: `chmod 600 instance/vcf_credentials.db`

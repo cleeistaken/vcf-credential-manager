@@ -33,12 +33,48 @@ mkdir -p ssl
 # Check for SSL certificates
 if [ ! -f "ssl/cert.pem" ] || [ ! -f "ssl/key.pem" ]; then
     echo -e "${YELLOW}SSL certificates not found. Generating self-signed certificates...${NC}"
+    
+    # Get the server's hostname and IP addresses
+    HOSTNAME=$(hostname)
+    IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+    
+    # Create OpenSSL config for SAN (Subject Alternative Names)
+    cat > ssl/openssl.cnf <<EOF
+[req]
+default_bits = 4096
+prompt = no
+default_md = sha256
+distinguished_name = dn
+req_extensions = v3_req
+
+[dn]
+C=US
+ST=State
+L=City
+O=Organization
+CN=${HOSTNAME}
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${HOSTNAME}
+DNS.2 = localhost
+DNS.3 = *.local
+IP.1 = ${IP_ADDR}
+IP.2 = 127.0.0.1
+EOF
+    
     openssl req -x509 -newkey rsa:4096 -nodes \
         -keyout ssl/key.pem \
         -out ssl/cert.pem \
         -days 365 \
-        -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
-    echo -e "${GREEN}SSL certificates generated${NC}"
+        -config ssl/openssl.cnf \
+        -extensions v3_req
+    
+    rm -f ssl/openssl.cnf
+    echo -e "${GREEN}SSL certificates generated for ${HOSTNAME} (${IP_ADDR})${NC}"
+    echo -e "${YELLOW}Note: You may still need to accept the self-signed certificate in your browser${NC}"
 fi
 
 # Check if database exists
