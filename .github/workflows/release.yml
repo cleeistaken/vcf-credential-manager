@@ -20,7 +20,7 @@ jobs:
 
     - name: Create release archive
       run: |
-        zip -r vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.zip . \
+        zip -r vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip . \
           -x "*.git*" \
           -x "*.idea/*" \
           -x "*__pycache__/*" \
@@ -57,7 +57,7 @@ jobs:
             --exclude='*.zip' \
             --exclude='*.tar.gz' \
             --ignore-failed-read \
-            -czvf vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.tar.gz . || [[ $? -eq 1 ]]
+            -czvf vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.tar.gz . || [[ $? -eq 1 ]]
 
     - name: Generate release notes
       run: |
@@ -74,7 +74,7 @@ jobs:
         
         ```bash
         # Extract the archive
-        unzip vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-manager
+        unzip vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-manager
         cd vcf-credentials-manager
         
         # Install dependencies
@@ -104,7 +104,7 @@ jobs:
         draft: false
         prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
         files: |
-          vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.zip
-          vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.tar.gz
+          vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip
+          vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
