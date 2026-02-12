@@ -18,6 +18,31 @@ jobs:
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+    - name: Update version.json for release
+      run: |
+        TAG="${GITHUB_REF#refs/tags/}"
+        COMMIT="${GITHUB_SHA}"
+        COMMIT_SHORT="${GITHUB_SHA:0:7}"
+        BUILD_DATE=$(date -u +"%Y-%m-%d")
+        BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        
+        mkdir -p static/json
+        cat > static/json/version.json << EOF
+        {
+          "version": "${TAG}",
+          "build_type": "release",
+          "branch": "main",
+          "commit": "${COMMIT}",
+          "commit_short": "${COMMIT_SHORT}",
+          "tag": "${TAG}",
+          "build_date": "${BUILD_DATE}",
+          "build_timestamp": "${BUILD_TIMESTAMP}"
+        }
+        EOF
+        
+        echo "Updated static/json/version.json for release:"
+        cat static/json/version.json
+
     - name: Create release archive
       run: |
         zip -r vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip . \

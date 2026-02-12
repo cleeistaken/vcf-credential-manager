@@ -1,0 +1,61 @@
+name: Update Version
+
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'static/json/version.json'
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    # Don't run on tag pushes (release workflow handles those)
+    if: "!startsWith(github.ref, 'refs/tags/')"
+    
+    permissions:
+      contents: write
+
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update version.json
+      run: |
+        BRANCH="${GITHUB_REF#refs/heads/}"
+        COMMIT="${GITHUB_SHA}"
+        COMMIT_SHORT="${GITHUB_SHA:0:7}"
+        BUILD_DATE=$(date -u +"%Y-%m-%d")
+        BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        
+        mkdir -p static/json
+        cat > static/json/version.json << EOF
+        {
+          "version": "${COMMIT_SHORT}",
+          "build_type": "development",
+          "branch": "${BRANCH}",
+          "commit": "${COMMIT}",
+          "commit_short": "${COMMIT_SHORT}",
+          "build_date": "${BUILD_DATE}",
+          "build_timestamp": "${BUILD_TIMESTAMP}"
+        }
+        EOF
+        
+        echo "Updated static/json/version.json:"
+        cat static/json/version.json
+
+    - name: Commit version.json
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+        # Check if there are changes to commit
+        if git diff --quiet static/json/version.json; then
+          echo "No changes to version.json"
+        else
+          git add static/json/version.json
+          git commit -m "chore: update version.json [skip ci]"
+          git push
+        fi
