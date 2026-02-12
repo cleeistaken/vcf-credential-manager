@@ -15,6 +15,24 @@
         </div>
     </div>
     
+    <!-- Version Information Card -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Application Version</h3>
+            <button class="btn btn-outline btn-sm" onclick="loadVersionInfo()">
+                Refresh
+            </button>
+        </div>
+        <div class="card-block">
+            <div id="version-info">
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading version information...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Storage Information Card -->
     <div class="card">
         <div class="card-header">
@@ -247,6 +265,70 @@
     
     @keyframes spin {
         to { transform: rotate(360deg); }
+    }
+    
+    /* Version Info */
+    .version-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .version-item {
+        padding: 0.75rem 1rem;
+        background: #f5f5f5;
+        border-radius: 3px;
+        border-left: 3px solid #0072a3;
+    }
+    
+    .version-item-label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+    
+    .version-item-value {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #313131;
+        word-break: break-all;
+    }
+    
+    .version-item-value.version-highlight {
+        font-size: 1.1rem;
+        color: #0072a3;
+    }
+    
+    .version-item-value code {
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.85rem;
+        background: #e8e8e8;
+        padding: 0.1rem 0.3rem;
+        border-radius: 2px;
+    }
+    
+    .version-badge {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-radius: 3px;
+        margin-left: 0.5rem;
+    }
+    
+    .version-badge-release {
+        background-color: #60b515;
+        color: #fff;
+    }
+    
+    .version-badge-development {
+        background-color: #ffc107;
+        color: #333;
     }
     
     /* Storage Grid */
@@ -501,6 +583,65 @@
 
 {% block extra_js %}
 <script>
+    async function loadVersionInfo() {
+        const versionDiv = document.getElementById('version-info');
+        versionDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading version information...</span></div>';
+        
+        try {
+            const response = await fetch('/api/version');
+            if (response.ok) {
+                const data = await response.json();
+                
+                const isRelease = data.build_type === 'release';
+                const badgeClass = isRelease ? 'version-badge-release' : 'version-badge-development';
+                const badgeText = isRelease ? 'Release' : 'Development';
+                
+                let versionDisplay = data.version;
+                if (data.tag) {
+                    versionDisplay = data.tag;
+                }
+                
+                versionDiv.innerHTML = `
+                    <div class="version-grid">
+                        <div class="version-item">
+                            <div class="version-item-label">Version</div>
+                            <div class="version-item-value version-highlight">
+                                ${versionDisplay}
+                                <span class="version-badge ${badgeClass}">${badgeText}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="version-item">
+                            <div class="version-item-label">Branch</div>
+                            <div class="version-item-value"><code>${data.branch || 'unknown'}</code></div>
+                        </div>
+                        
+                        <div class="version-item">
+                            <div class="version-item-label">Commit</div>
+                            <div class="version-item-value"><code>${data.commit_short || 'unknown'}</code></div>
+                        </div>
+                        
+                        <div class="version-item">
+                            <div class="version-item-label">Build Date</div>
+                            <div class="version-item-value">${data.build_date || 'unknown'}</div>
+                        </div>
+                    </div>
+                    
+                    ${data.commit && data.commit !== 'unknown' ? `
+                    <div style="margin-top: 1rem; font-size: 0.75rem; color: #666;">
+                        <strong>Full Commit:</strong> <code style="font-size: 0.7rem;">${data.commit}</code>
+                    </div>
+                    ` : ''}
+                `;
+            } else {
+                versionDiv.innerHTML = '<p class="text-muted">Unable to load version information</p>';
+            }
+        } catch (error) {
+            console.error('Error loading version info:', error);
+            versionDiv.innerHTML = '<p class="text-muted">Unable to load version information</p>';
+        }
+    }
+    
     async function loadStorageInfo() {
         const storageDiv = document.getElementById('storage-info');
         storageDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading storage information...</span></div>';
@@ -639,6 +780,7 @@
     }
     
     document.addEventListener('DOMContentLoaded', function() {
+        loadVersionInfo();
         loadStorageInfo();
         loadSchedulerStatus();
     });

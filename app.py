@@ -6,6 +6,7 @@ Main Flask application with HTTPS support and authentication
 
 import os
 import sys
+import json
 import requests
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -140,6 +141,33 @@ def log_user_access(username, action, details=None):
     log_message += f" | AGENT={user_agent}"
     
     access_logger.info(log_message)
+
+
+def get_version_info():
+    """Read version information from static/json/version.json file"""
+    version_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'json', 'version.json')
+    
+    default_version = {
+        "version": "dev",
+        "build_type": "development",
+        "branch": "unknown",
+        "commit": "unknown",
+        "commit_short": "unknown",
+        "build_date": "unknown",
+        "build_timestamp": "unknown"
+    }
+    
+    try:
+        if os.path.exists(version_file):
+            with open(version_file, 'r') as f:
+                version_info = json.load(f)
+                # Merge with defaults to ensure all fields exist
+                return {**default_version, **version_info}
+    except Exception as e:
+        # Log error but don't fail - return default version
+        print(f"Warning: Could not read static/json/version.json: {e}")
+    
+    return default_version
 
 
 # Use app logger throughout the application
@@ -1784,6 +1812,13 @@ IP.2 = 127.0.0.1
     except Exception as e:
         app.logger.error(f"Error generating SSL certificate: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/version')
+@login_required
+def api_version():
+    """Get application version information"""
+    return jsonify(get_version_info())
 
 
 @app.route('/api/storage-info')
