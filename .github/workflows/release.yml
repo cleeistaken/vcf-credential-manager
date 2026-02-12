@@ -1,0 +1,143 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    permissions: write-all
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+
+    steps:
+    - name: Display trigger information
+      run: |
+        echo "🎉 Release triggered by tag push: ${{ github.ref }}"
+        echo "🐧 Running on: ${{ runner.os }}"
+        echo "📦 Repository: ${{ github.repository }}"
+
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: List repository files
+      run: |
+        echo "📁 Repository contents:"
+        ls -la
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run basic validation
+      run: |
+        python -c "import app; print('✅ Application imports successfully')"
+
+    - name: Create release archive
+      run: |
+        # Create a clean release archive excluding unnecessary files
+        zip -r vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip . \
+          -x "*.git*" \
+          -x "*.idea/*" \
+          -x "*__pycache__/*" \
+          -x "*.pyc" \
+          -x "*.pyo" \
+          -x "*.DS_Store" \
+          -x "*.env" \
+          -x "instance/*" \
+          -x "logs/*" \
+          -x "ssl/*.pem" \
+          -x "ssl/*.key" \
+          -x "ssl/*.crt" \
+          -x "*.db" \
+          -x "Pipfile.lock"
+
+    - name: Create tarball archive
+      run: |
+        # Create a tarball for Linux users
+        tar --exclude='.git' \
+            --exclude='.idea' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='*.pyo' \
+            --exclude='.DS_Store' \
+            --exclude='.env' \
+            --exclude='instance' \
+            --exclude='logs' \
+            --exclude='ssl/*.pem' \
+            --exclude='ssl/*.key' \
+            --exclude='ssl/*.crt' \
+            --exclude='*.db' \
+            --exclude='Pipfile.lock' \
+            -czvf vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz .
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        cat << 'EOF' > release_notes.md
+        ## VCF Credentials Fetch ${{ steps.get_version.outputs.VERSION }}
+        
+        ### Installation
+        
+        1. Download and extract the release archive
+        2. Install dependencies: `pip install -r requirements.txt`
+        3. Run the application: `./start_https.sh`
+        
+        ### Quick Start
+        
+        ```bash
+        # Extract the archive
+        unzip vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-fetch
+        cd vcf-credentials-fetch
+        
+        # Install dependencies
+        pip install -r requirements.txt
+        
+        # Start the application
+        ./start_https.sh
+        ```
+        
+        ### Default Credentials
+        
+        - Username: `admin`
+        - Password: `admin`
+        
+        **Important:** Change the default password after first login.
+        
+        ### Documentation
+        
+        See the [README](README.md) and [docs](docs/) folder for detailed documentation.
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ steps.get_version.outputs.VERSION }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+        files: |
+          vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip
+          vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Release summary
+      run: |
+        echo "✅ Release ${{ steps.get_version.outputs.VERSION }} created successfully!"
+        echo "📦 Assets uploaded:"
+        echo "   - vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip"
+        echo "   - vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz"
