@@ -3,6 +3,7 @@ logs/*.log
 instance/*.db
 ssl/*.pem
 *.pid
+static/json/version.json
 
 
 # Python
