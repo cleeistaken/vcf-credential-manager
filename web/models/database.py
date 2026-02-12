@@ -83,14 +83,14 @@ class Credential(db.Model):
     """Credential model for storing fetched passwords"""
     __tablename__ = 'credentials'
     __table_args__ = (
-        db.UniqueConstraint('environment_id', 'hostname', 'credential_type', 'username', 
+        db.UniqueConstraint('environment_id', 'hostname', 'credential_type', 'username', 'source',
                            name='uq_credential_identity'),
     )
     
     id = db.Column(db.Integer, primary_key=True)
     environment_id = db.Column(db.Integer, db.ForeignKey('environments.id'), nullable=False)
     
-    # Unique identity fields: hostname + credential_type + username
+    # Unique identity fields: hostname + credential_type + username + source
     hostname = db.Column(db.String(255), nullable=False)
     username = db.Column(db.String(100), nullable=False)
     credential_type = db.Column(db.String(50), nullable=False)  # SSH, API, SSO, etc.

@@ -319,9 +319,15 @@
   "installer_host": "vcf-installer.example.com",
   "installer_username": "admin",
   "installer_password": "password123",
+  "installer_ssl_verify": true,
+  "installer_sync_enabled": false,
+  "installer_sync_interval_minutes": 0,
   "manager_host": "sddc-manager.example.com",
   "manager_username": "administrator@vsphere.local",
-  "manager_password": "password123"
+  "manager_password": "password123",
+  "manager_ssl_verify": true,
+  "manager_sync_enabled": true,
+  "manager_sync_interval_minutes": 60
 }</pre>
                         <h5>YAML Format:</h5>
                         <pre class="code-preview code-preview-sm">name: Production VCF
@@ -329,9 +335,15 @@ description: Production environment
 installer_host: vcf-installer.example.com
 installer_username: admin
 installer_password: password123
+installer_ssl_verify: true
+installer_sync_enabled: false
+installer_sync_interval_minutes: 0
 manager_host: sddc-manager.example.com
 manager_username: administrator@vsphere.local
-manager_password: password123</pre>
+manager_password: password123
+manager_ssl_verify: true
+manager_sync_enabled: true
+manager_sync_interval_minutes: 60</pre>
                     </div>
                 </details>
             </div>

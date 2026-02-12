@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler import events
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone
@@ -166,8 +167,27 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'warning'  # Use warning style for login required message
 
-# Initialize scheduler
-scheduler = BackgroundScheduler()
+# Initialize scheduler with error logging
+def scheduler_error_listener(event):
+    """Log scheduler job errors"""
+    if event.exception:
+        app.logger.error(f"Scheduler job {event.job_id} failed with exception: {event.exception}")
+    else:
+        app.logger.info(f"Scheduler job {event.job_id} executed successfully")
+
+def scheduler_job_submitted(event):
+    """Log when a job is submitted for execution"""
+    app.logger.info(f"Scheduler job {event.job_id} submitted for execution")
+
+scheduler = BackgroundScheduler(
+    job_defaults={
+        'coalesce': True,  # Combine multiple missed runs into one
+        'max_instances': 1,  # Only one instance of each job at a time
+        'misfire_grace_time': 60 * 60  # Allow jobs to run up to 1 hour late
+    }
+)
+scheduler.add_listener(scheduler_error_listener, events.EVENT_JOB_ERROR | events.EVENT_JOB_EXECUTED)
+scheduler.add_listener(scheduler_job_submitted, events.EVENT_JOB_SUBMITTED)
 scheduler.start()
 app.logger.info("Background scheduler started")
 
@@ -241,6 +261,9 @@ def fetch_credentials_for_environment(env_id, source=None):
         env_id: Environment ID to sync
         source: Optional - 'installer', 'manager', or None for both
     """
+    source_desc = f" ({source})" if source else ""
+    app.logger.info(f"Scheduled sync starting for environment ID: {env_id}{source_desc}")
+    
     with app.app_context():
         try:
             environment = db.session.get(Environment, env_id)
@@ -248,7 +271,6 @@ def fetch_credentials_for_environment(env_id, source=None):
                 app.logger.error(f"Environment {env_id} not found")
                 return
 
-            source_desc = f" ({source})" if source else ""
             app.logger.info(f"Fetching credentials for environment: {environment.name} (ID: {env_id}){source_desc}")
             fetcher = VCFCredentialFetcher()
             
@@ -336,11 +358,19 @@ def fetch_credentials_for_environment(env_id, source=None):
                 app.logger.debug(f"Updating database with {len(credentials)} credentials")
                 
                 # Get existing credentials for comparison
-                # Key is (hostname, credential_type, username) - the unique identity
-                existing_creds = {
-                    (c.hostname, c.credential_type, c.username): c 
-                    for c in Credential.query.filter_by(environment_id=env_id).all()
-                }
+                # Key is (hostname, credential_type, username, source) - the unique identity
+                # When syncing a single source, only load credentials from that source
+                if source:
+                    source_filter = 'VCF_INSTALLER' if source == 'installer' else 'SDDC_MANAGER'
+                    existing_creds = {
+                        (c.hostname, c.credential_type, c.username, c.source): c 
+                        for c in Credential.query.filter_by(environment_id=env_id, source=source_filter).all()
+                    }
+                else:
+                    existing_creds = {
+                        (c.hostname, c.credential_type, c.username, c.source): c 
+                        for c in Credential.query.filter_by(environment_id=env_id).all()
+                    }
                 
                 # Track changes
                 updated_count = 0
@@ -353,18 +383,19 @@ def fetch_credentials_for_environment(env_id, source=None):
                     username = cred_data.get('username', '')
                     new_password = cred_data.get('password', '')
                     credential_type = cred_data.get('credentialType', 'USER')
+                    cred_source = cred_data.get('source', 'SDDC_MANAGER')
                     
                     # Skip if missing required fields
                     if not hostname or not username or not credential_type:
                         app.logger.warning(f"Skipping credential with missing required fields: hostname={hostname}, username={username}, type={credential_type}")
                         continue
                     
-                    # Unique key: hostname + credential_type + username
-                    key = (hostname, credential_type, username)
+                    # Unique key: hostname + credential_type + username + source
+                    key = (hostname, credential_type, username, cred_source)
                     
                     # Skip duplicates from the API response
                     if key in seen_keys:
-                        app.logger.debug(f"Skipping duplicate credential from API: {hostname}:{username} ({credential_type})")
+                        app.logger.debug(f"Skipping duplicate credential from API: {hostname}:{username} ({credential_type}) from {cred_source}")
                         continue
                     seen_keys.add(key)
                     
@@ -381,14 +412,14 @@ def fetch_credentials_for_environment(env_id, source=None):
                             )
                             db.session.add(history_entry)
                             password_changes += 1
-                            app.logger.info(f"Password changed for {hostname}:{username} ({credential_type})")
+                            app.logger.info(f"Password changed for {hostname}:{username} ({credential_type}) from {cred_source}")
                         
                         # Update credential with new data
                         existing_cred.password = new_password
                         existing_cred.account_type = cred_data.get('accountType', 'USER')
                         existing_cred.resource_type = cred_data.get('resourceType', '')
                         existing_cred.domain_name = cred_data.get('domainName', '')
-                        existing_cred.source = cred_data.get('source', 'SDDC_MANAGER')
+                        existing_cred.source = cred_source
                         existing_cred.last_updated = datetime.now(timezone.utc)
                         updated_count += 1
                         
@@ -403,19 +434,27 @@ def fetch_credentials_for_environment(env_id, source=None):
                             account_type=cred_data.get('accountType', 'USER'),
                             resource_type=cred_data.get('resourceType', ''),
                             domain_name=cred_data.get('domainName', ''),
-                            source=cred_data.get('source', 'SDDC_MANAGER'),
+                            source=cred_source,
                             last_updated=datetime.now(timezone.utc)
                         )
                         db.session.add(new_cred)
                         new_count += 1
                 
-                # Only remove credentials if sync was fully successful
-                # Don't remove if we had partial failure (might just be one source down)
+                # Only remove credentials that are no longer present from the synced source(s)
+                # For single-source sync: only remove credentials from that source
+                # For full sync: only remove if sync was fully successful
                 removed_count = 0
-                if sync_status == 'success':
+                if source:
+                    # Single source sync - safe to remove credentials from this source that weren't returned
                     for old_cred in existing_creds.values():
                         db.session.delete(old_cred)
                         removed_count += 1
+                elif sync_status == 'success':
+                    # Full sync was successful - safe to remove all missing credentials
+                    for old_cred in existing_creds.values():
+                        db.session.delete(old_cred)
+                        removed_count += 1
+                # If sync_status is 'partial' or 'failed' for a full sync, don't remove anything
                 
                 app.logger.info(
                     f"Sync {sync_status} for {environment.name}: "
@@ -468,7 +507,8 @@ def schedule_environment_sync(environment):
         )
         job = scheduler.get_job(installer_job_id)
         if job:
-            app.logger.info(f"Scheduled installer sync for {environment.name} every {environment.installer_sync_interval_minutes} minutes")
+            next_run = job.next_run_time.strftime('%Y-%m-%d %H:%M:%S') if job.next_run_time else 'Not scheduled'
+            app.logger.info(f"Scheduled installer sync for {environment.name} every {environment.installer_sync_interval_minutes} minutes (next run: {next_run})")
     else:
         app.logger.debug(f"Installer sync not enabled for {environment.name}")
     
@@ -492,7 +532,8 @@ def schedule_environment_sync(environment):
         )
         job = scheduler.get_job(manager_job_id)
         if job:
-            app.logger.info(f"Scheduled manager sync for {environment.name} every {environment.manager_sync_interval_minutes} minutes")
+            next_run = job.next_run_time.strftime('%Y-%m-%d %H:%M:%S') if job.next_run_time else 'Not scheduled'
+            app.logger.info(f"Scheduled manager sync for {environment.name} every {environment.manager_sync_interval_minutes} minutes (next run: {next_run})")
     else:
         app.logger.debug(f"Manager sync not enabled for {environment.name}")
     
@@ -544,14 +585,14 @@ def _migrate_database():
             app.logger.debug(f"Column {column_name} already exists")
     
     # Clean up duplicate credentials - keep only the most recent one for each unique key
-    # Unique key: environment_id + hostname + credential_type + username
+    # Unique key: environment_id + hostname + credential_type + username + source
     app.logger.info("Checking for duplicate credentials...")
     
-    # Find duplicates
+    # Find duplicates (including source in the unique key)
     cursor.execute("""
-        SELECT environment_id, hostname, credential_type, username, COUNT(*) as cnt, GROUP_CONCAT(id) as ids
+        SELECT environment_id, hostname, credential_type, username, source, COUNT(*) as cnt, GROUP_CONCAT(id) as ids
         FROM credentials
-        GROUP BY environment_id, hostname, credential_type, username
+        GROUP BY environment_id, hostname, credential_type, username, source
         HAVING cnt > 1
     """)
     duplicates = cursor.fetchall()
@@ -561,7 +602,7 @@ def _migrate_database():
         total_removed = 0
         
         for dup in duplicates:
-            env_id, hostname, cred_type, username, count, id_list = dup
+            env_id, hostname, cred_type, username, source, count, id_list = dup
             ids = [int(x) for x in id_list.split(',')]
             
             # Keep the one with the most recent last_updated, or highest ID if no dates
@@ -626,6 +667,16 @@ def init_database():
             for env in environments:
                 if env.installer_sync_enabled or env.manager_sync_enabled:
                     schedule_environment_sync(env)
+            
+            # Log all scheduled jobs for debugging
+            all_jobs = scheduler.get_jobs()
+            if all_jobs:
+                app.logger.info(f"Scheduler has {len(all_jobs)} job(s) scheduled:")
+                for job in all_jobs:
+                    next_run = job.next_run_time.strftime('%Y-%m-%d %H:%M:%S') if job.next_run_time else 'None'
+                    app.logger.info(f"  - {job.id}: next run at {next_run}")
+            else:
+                app.logger.info("No jobs scheduled in scheduler")
                 
             app.logger.info("Database initialization complete")
         except Exception as e:
@@ -1327,18 +1378,38 @@ def api_sync_environment(env_id):
 @admin_required
 def api_scheduler_status():
     """Get scheduler status and list of scheduled jobs (admin only)"""
+    from datetime import datetime
+    
     jobs = []
+    now = datetime.now()
     for job in scheduler.get_jobs():
+        next_run = job.next_run_time
+        time_until = None
+        if next_run:
+            # Make both timezone-naive for comparison
+            if next_run.tzinfo:
+                next_run_naive = next_run.replace(tzinfo=None)
+            else:
+                next_run_naive = next_run
+            delta = next_run_naive - now
+            time_until = f"{int(delta.total_seconds() / 60)} minutes" if delta.total_seconds() > 0 else "overdue"
+        
         jobs.append({
             'id': job.id,
             'name': job.name,
-            'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
-            'trigger': str(job.trigger)
+            'next_run_time': next_run.isoformat() if next_run else None,
+            'next_run_time_local': next_run.strftime('%Y-%m-%d %H:%M:%S') if next_run else None,
+            'time_until_next_run': time_until,
+            'trigger': str(job.trigger),
+            'func': str(job.func),
+            'args': str(job.args)
         })
     
     return jsonify({
         'running': scheduler.running,
+        'state': scheduler.state,
         'job_count': len(jobs),
+        'current_time': now.strftime('%Y-%m-%d %H:%M:%S'),
         'jobs': jobs
     })
 

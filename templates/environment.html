@@ -207,7 +207,7 @@
                             <th><select class="filter-select" id="filter-credential-type" onchange="applyFilters()"><option value="">All</option></select></th>
                             <th><select class="filter-select" id="filter-account-type" onchange="applyFilters()"><option value="">All</option></select></th>
                             <th><select class="filter-select" id="filter-resource-type" onchange="applyFilters()"><option value="">All</option></select></th>
-                            <th><input type="text" class="filter-input" id="filter-domain" placeholder="Filter..." onkeyup="applyFilters()"></th>
+                            <th><select class="filter-select" id="filter-domain" onchange="applyFilters()"><option value="">All</option></select></th>
                             <th><select class="filter-select" id="filter-source" onchange="applyFilters()"><option value="">All</option><option value="VCF_INSTALLER">Installer</option><option value="SDDC_MANAGER">Manager</option></select></th>
                             <th></th>
                             <th><button class="btn btn-link btn-sm" onclick="clearFilters()">Clear</button></th>
@@ -1086,7 +1086,6 @@
         
         creds.forEach(cred => {
             const tr = document.createElement('tr');
-            const sourceIcon = cred.source === 'VCF_INSTALLER' ? '🔧' : '🖥️';
             const sourceLabel = cred.source === 'VCF_INSTALLER' ? 'Installer' : 'Manager';
             
             tr.innerHTML = `
@@ -1099,7 +1098,7 @@
                 <td>${escapeHtml(cred.account_type || '')}</td>
                 <td>${escapeHtml(cred.resource_type || '')}</td>
                 <td>${escapeHtml(cred.domain_name || '')}</td>
-                <td><span title="${cred.source || 'SDDC_MANAGER'}">${sourceIcon} ${sourceLabel}</span></td>
+                <td>${sourceLabel}</td>
                 <td>${cred.last_updated ? new Date(cred.last_updated).toLocaleString() : ''}</td>
                 <td>
                     <button class="btn btn-link btn-icon-only" onclick="togglePassword(${cred.id})" title="Show/Hide">👁️</button>
@@ -1121,10 +1120,12 @@
         const credentialTypes = [...new Set(credentials.map(c => c.credential_type).filter(v => v))].sort();
         const accountTypes = [...new Set(credentials.map(c => c.account_type).filter(v => v))].sort();
         const resourceTypes = [...new Set(credentials.map(c => c.resource_type).filter(v => v))].sort();
+        const domains = [...new Set(credentials.map(c => c.domain_name).filter(v => v))].sort();
         
         populateSelect('filter-credential-type', credentialTypes);
         populateSelect('filter-account-type', accountTypes);
         populateSelect('filter-resource-type', resourceTypes);
+        populateSelect('filter-domain', domains);
     }
     
     function populateSelect(id, options) {
@@ -1158,7 +1159,7 @@
             credentialType: document.getElementById('filter-credential-type').value,
             accountType: document.getElementById('filter-account-type').value,
             resourceType: document.getElementById('filter-resource-type').value,
-            domain: document.getElementById('filter-domain').value.toLowerCase(),
+            domain: document.getElementById('filter-domain').value,
             source: document.getElementById('filter-source').value
         };
         
@@ -1174,7 +1175,7 @@
                 (!filters.credentialType || cred.credential_type === filters.credentialType) &&
                 (!filters.accountType || cred.account_type === filters.accountType) &&
                 (!filters.resourceType || cred.resource_type === filters.resourceType) &&
-                (!filters.domain || (cred.domain_name || '').toLowerCase().includes(filters.domain)) &&
+                (!filters.domain || cred.domain_name === filters.domain) &&
                 (!filters.source || cred.source === filters.source);
         });
         
