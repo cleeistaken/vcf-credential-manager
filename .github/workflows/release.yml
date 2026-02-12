@@ -34,8 +34,7 @@ jobs:
           -x "ssl/*.key" \
           -x "ssl/*.crt" \
           -x "*.db" \
-          -x "Pipfile.lock" \
-          -x "tools/*"
+          -x "Pipfile.lock"
 
     - name: Create tarball archive
       run: |
@@ -53,7 +52,6 @@ jobs:
             --exclude='ssl/*.crt' \
             --exclude='*.db' \
             --exclude='Pipfile.lock' \
-            --exclude='tools' \
             --exclude='*.zip' \
             --exclude='*.tar.gz' \
             --ignore-failed-read \
@@ -64,13 +62,9 @@ jobs:
         cat << 'EOF' > release_notes.md
         ## VCF Credentials Manager ${{ steps.get_version.outputs.VERSION }}
         
-        ### Installation
+        ### Installation Options
         
-        1. Download and extract the release archive
-        2. Install dependencies: `pip install -r requirements.txt`
-        3. Run the application: `./start_https.sh`
-        
-        ### Quick Start
+        #### Option 1: Quick Start (Development)
         
         ```bash
         # Extract the archive
@@ -83,6 +77,32 @@ jobs:
         # Start the application
         ./start_https.sh
         ```
+        
+        Access at: https://localhost:5000
+        
+        #### Option 2: Ubuntu Service Installation (Production)
+        
+        For Ubuntu 24.04, use the automated installer to set up as a systemd service:
+        
+        ```bash
+        # Extract the archive
+        unzip vcf-credentials-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-manager
+        cd vcf-credentials-manager/tools
+        
+        # Run the installer (copies files to /opt/vcf-credential-manager)
+        sudo ./install-vcf-credential-manager.sh
+        ```
+        
+        Access at: https://localhost (port 443)
+        
+        The installer will:
+        - Copy application files to `/opt/vcf-credential-manager`
+        - Install system dependencies (Python, pipenv, etc.)
+        - Generate SSL certificates
+        - Create and enable systemd service
+        - Configure firewall (UFW)
+        
+        See [Ubuntu Service Installation Guide](docs/UBUNTU_SERVICE_INSTALL.md) for details.
         
         ### Default Credentials
         

@@ -4,6 +4,8 @@ A web application for managing VMware Cloud Foundation (VCF) credentials with au
 
 ## Quick Start
 
+### Option 1: Development / Manual Setup
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -14,6 +16,23 @@ pip install -r requirements.txt
 # Access at https://localhost:5000
 # Default login: admin / admin
 ```
+
+### Option 2: Ubuntu Service Installation (Recommended for Production)
+
+For Ubuntu 24.04, use the automated installer to set up VCF Credential Manager as a systemd service:
+
+```bash
+# After downloading release bundle or cloning the repository:
+cd vcf-credential-manager/tools
+sudo ./install-vcf-credential-manager.sh
+
+# Access at https://localhost (port 443)
+# Default login: admin / admin
+```
+
+The installer copies files to `/opt/vcf-credential-manager` and sets up a systemd service.
+
+See [Ubuntu Service Installation Guide](docs/UBUNTU_SERVICE_INSTALL.md) for details.
 
 **Change the default password immediately after first login.**
 
@@ -72,7 +91,7 @@ Logs are stored in the `logs/` directory:
 
 See the `docs/` directory for detailed documentation:
 
-- [Quick Start Guide](QUICKSTART.md) - Installation and first steps
+- [Ubuntu Service Installation](docs/UBUNTU_SERVICE_INSTALL.md) - Automated Ubuntu 24.04 setup
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [User Management](docs/USER_MANAGEMENT.md) - Users, roles, and SSL certificates
