@@ -65,8 +65,12 @@ async function editEnvironment(envId) {
         document.getElementById('manager-host').value = env.manager_host || '';
         document.getElementById('manager-username').value = env.manager_username || '';
         document.getElementById('manager-ssl-verify').checked = env.manager_ssl_verify !== false;
-        document.getElementById('sync-enabled').checked = env.sync_enabled;
-        document.getElementById('sync-interval').value = env.sync_interval_minutes;
+        
+        // Separate sync settings for installer and manager
+        document.getElementById('installer-sync-enabled').checked = env.installer_sync_enabled || false;
+        document.getElementById('installer-sync-interval').value = env.installer_sync_interval_minutes || 0;
+        document.getElementById('manager-sync-enabled').checked = env.manager_sync_enabled !== false;
+        document.getElementById('manager-sync-interval').value = env.manager_sync_interval_minutes || 60;
         
         // Show installer section if it has data
         const hasInstallerData = env.installer_host || env.installer_username;
@@ -95,8 +99,11 @@ async function saveEnvironment() {
         manager_username: formData.get('manager_username'),
         manager_password: formData.get('manager_password'),
         manager_ssl_verify: document.getElementById('manager-ssl-verify').checked,
-        sync_enabled: document.getElementById('sync-enabled').checked,
-        sync_interval_minutes: parseInt(formData.get('sync_interval_minutes')),
+        // Separate sync settings for installer and manager
+        installer_sync_enabled: document.getElementById('installer-sync-enabled').checked,
+        installer_sync_interval_minutes: parseInt(formData.get('installer_sync_interval_minutes')) || 0,
+        manager_sync_enabled: document.getElementById('manager-sync-enabled').checked,
+        manager_sync_interval_minutes: parseInt(formData.get('manager_sync_interval_minutes')) || 60,
         ssl_verify: true  // Legacy field
     };
     
@@ -279,21 +286,19 @@ async function syncEnvironment(envId) {
             method: 'POST'
         });
         
+        const result = await response.json();
+        
         if (response.ok) {
-            // Reload credential count
-            const credsResponse = await fetch(`/api/environments/${envId}/credentials`);
-            const credentials = await credsResponse.json();
-            countElement.textContent = `${credentials.length} credential${credentials.length !== 1 ? 's' : ''}`;
-            alert('Credentials synced successfully');
+            // Reload to get updated status including any errors
+            location.reload();
         } else {
-            const error = await response.json();
-            countElement.textContent = 'Sync failed';
-            alert(`Failed to sync credentials: ${error.error || 'Unknown error'}`);
+            // Still reload to show any partial results and error status
+            location.reload();
         }
     } catch (error) {
         console.error('Error syncing environment:', error);
-        countElement.textContent = 'Error';
-        alert('Failed to sync credentials');
+        // Reload to show current state
+        location.reload();
     }
 }
 
@@ -316,6 +321,165 @@ document.addEventListener('keydown', function(event) {
         if (modal.classList.contains('show')) {
             closeEnvironmentModal();
         }
+        const importModal = document.getElementById('import-modal');
+        if (importModal.classList.contains('show')) {
+            closeImportModal();
+        }
+    }
+});
+
+// Import Environment Functions
+function openImportModal() {
+    document.getElementById('import-file').value = '';
+    document.getElementById('import-preview-section').style.display = 'none';
+    document.getElementById('import-validation-section').style.display = 'none';
+    document.getElementById('import-btn').disabled = true;
+    document.getElementById('import-modal').classList.add('show');
+}
+
+function closeImportModal() {
+    document.getElementById('import-modal').classList.remove('show');
+}
+
+async function previewImportFile() {
+    const fileInput = document.getElementById('import-file');
+    const previewSection = document.getElementById('import-preview-section');
+    const previewElement = document.getElementById('import-preview');
+    const importBtn = document.getElementById('import-btn');
+    const validationSection = document.getElementById('import-validation-section');
+    
+    validationSection.style.display = 'none';
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        previewSection.style.display = 'none';
+        importBtn.disabled = true;
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        const content = e.target.result;
+        previewElement.textContent = content;
+        previewSection.style.display = 'block';
+        importBtn.disabled = false;
+    };
+    
+    reader.onerror = function() {
+        previewElement.textContent = 'Error reading file';
+        previewSection.style.display = 'block';
+        importBtn.disabled = true;
+    };
+    
+    reader.readAsText(file);
+}
+
+async function validateAndImport() {
+    const fileInput = document.getElementById('import-file');
+    const importBtn = document.getElementById('import-btn');
+    const validationSection = document.getElementById('import-validation-section');
+    const validationResults = document.getElementById('import-validation-results');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Please select a file first');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Show loading state
+    const originalText = importBtn.textContent;
+    importBtn.textContent = '⏳ Validating...';
+    importBtn.disabled = true;
+    validationSection.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/environments/import', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        // Show validation results
+        validationSection.style.display = 'block';
+        
+        if (response.ok && result.success) {
+            // Success - show results and close modal
+            let html = '<div class="alert alert-success">';
+            html += `<strong>✅ Environment "${result.environment.name}" created successfully!</strong><br><br>`;
+            html += '<strong>Connection Test Results:</strong><br>';
+            
+            if (result.connection_tests.installer) {
+                const test = result.connection_tests.installer;
+                html += `• Installer: ${test.success ? '✅' : '❌'} ${test.message}<br>`;
+            }
+            if (result.connection_tests.manager) {
+                const test = result.connection_tests.manager;
+                html += `• Manager: ${test.success ? '✅' : '❌'} ${test.message}<br>`;
+            }
+            html += '</div>';
+            
+            validationResults.innerHTML = html;
+            
+            // Reload page after short delay
+            setTimeout(() => {
+                closeImportModal();
+                location.reload();
+            }, 2000);
+            
+        } else {
+            // Error - show validation errors
+            let html = '<div class="alert alert-danger">';
+            html += `<strong>❌ Import Failed</strong><br><br>`;
+            
+            if (result.errors && result.errors.length > 0) {
+                html += '<strong>Validation Errors:</strong><ul>';
+                for (const error of result.errors) {
+                    html += `<li>${error}</li>`;
+                }
+                html += '</ul>';
+            }
+            
+            if (result.connection_tests) {
+                html += '<strong>Connection Test Results:</strong><br>';
+                if (result.connection_tests.installer) {
+                    const test = result.connection_tests.installer;
+                    html += `• Installer: ${test.success ? '✅' : '❌'} ${test.message}<br>`;
+                }
+                if (result.connection_tests.manager) {
+                    const test = result.connection_tests.manager;
+                    html += `• Manager: ${test.success ? '✅' : '❌'} ${test.message}<br>`;
+                }
+            }
+            
+            if (result.error) {
+                html += `<br><strong>Error:</strong> ${result.error}`;
+            }
+            
+            html += '</div>';
+            validationResults.innerHTML = html;
+            importBtn.disabled = false;
+        }
+        
+    } catch (error) {
+        console.error('Error importing environment:', error);
+        validationSection.style.display = 'block';
+        validationResults.innerHTML = `<div class="alert alert-danger">❌ Failed to import: ${error.message}</div>`;
+        importBtn.disabled = false;
+    } finally {
+        importBtn.textContent = originalText;
+    }
+}
+
+// Close import modal when clicking outside
+window.addEventListener('click', function(event) {
+    const importModal = document.getElementById('import-modal');
+    if (event.target === importModal) {
+        closeImportModal();
     }
 });
 

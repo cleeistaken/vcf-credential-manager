@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('settings') }}" class="btn btn-outline">
+                ← Back to Settings
+            </a>
+            <h1>👥 User Management</h1>
+            <p class="p6">Manage user accounts and permissions</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Add New User</h3>
+        <form method="POST" action="{{ url_for('add_user') }}" class="user-form" id="add-user-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" class="clr-input" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="clr-input" required minlength="8">
+                <span class="form-hint">Minimum 8 characters</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="role">Role</label>
+                <select id="role" name="role" class="clr-select" required>
+                    <option value="admin">Admin (Full Access)</option>
+                    <option value="readonly">Read-Only (View Only)</option>
+                </select>
+                <span class="form-hint">
+                    <strong>Admin:</strong> Can manage environments, sync credentials, and modify settings<br>
+                    <strong>Read-Only:</strong> Can only view credentials and environment information
+                </span>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">➕ Add User</button>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Existing Users</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        {{ user.username }}
+                        {% if user.id == current_user.id %}
+                        <span class="badge badge-info">You</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.role == 'admin' or user.is_admin %}
+                        <span class="badge badge-success">Admin</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Read-Only</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                    <td>
+                        {% if user.id != current_user.id %}
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                            🗑️ Delete
+                        </button>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        padding: 2rem;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        margin-bottom: 2rem;
+    }
+    
+    .page-header h1 {
+        margin: 0.5rem 0;
+    }
+    
+    .page-header .p6 {
+        color: #666;
+        margin: 0;
+    }
+    
+    .card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .card h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="password"],
+    .form-group select {
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .form-hint {
+        display: block;
+        font-size: 0.875rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    .user-form {
+        max-width: 600px;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .badge-success {
+        background-color: #60b515;
+        color: white;
+    }
+    
+    .badge-secondary {
+        background-color: #666;
+        color: white;
+    }
+    
+    .badge-info {
+        background-color: #0072a3;
+        color: white;
+    }
+    
+    .text-muted {
+        color: #666;
+    }
+    
+    .btn-danger {
+        background-color: #c92100 !important;
+        color: white !important;
+        border: 1px solid #c92100 !important;
+    }
+    
+    .btn-danger:hover {
+        background-color: #a01a00 !important;
+        border-color: #a01a00 !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function deleteUser(userId, username) {
+        if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/settings/users/${userId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                alert(`User "${username}" deleted successfully`);
+                location.reload();
+            } else {
+                const data = await response.json();
+                alert(`Failed to delete user: ${data.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('Failed to delete user');
+        }
+    }
+</script>
+{% endblock %}

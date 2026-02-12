@@ -49,10 +49,25 @@ class Environment(db.Model):
     # Legacy field for backward compatibility
     ssl_verify = db.Column(db.Boolean, default=True)
     
-    # Sync configuration
+    # Sync configuration - separate settings for installer and manager
+    # Installer sync (default: disabled)
+    installer_sync_enabled = db.Column(db.Boolean, default=False)
+    installer_sync_interval_minutes = db.Column(db.Integer, default=0)
+    
+    # Manager sync (default: enabled, 60 minutes)
+    manager_sync_enabled = db.Column(db.Boolean, default=True)
+    manager_sync_interval_minutes = db.Column(db.Integer, default=60)
+    
+    # Legacy fields for backward compatibility
     sync_enabled = db.Column(db.Boolean, default=False)
     sync_interval_minutes = db.Column(db.Integer, default=60)
+    
     last_sync = db.Column(db.DateTime)
+    
+    # Sync status tracking
+    last_sync_status = db.Column(db.String(20), default='never')  # 'success', 'partial', 'failed', 'never'
+    installer_error = db.Column(db.Text)  # Error message for installer connection
+    manager_error = db.Column(db.Text)  # Error message for manager connection
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -67,15 +82,21 @@ class Environment(db.Model):
 class Credential(db.Model):
     """Credential model for storing fetched passwords"""
     __tablename__ = 'credentials'
+    __table_args__ = (
+        db.UniqueConstraint('environment_id', 'hostname', 'credential_type', 'username', 
+                           name='uq_credential_identity'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     environment_id = db.Column(db.Integer, db.ForeignKey('environments.id'), nullable=False)
     
-    hostname = db.Column(db.String(255))
-    username = db.Column(db.String(100))
+    # Unique identity fields: hostname + credential_type + username
+    hostname = db.Column(db.String(255), nullable=False)
+    username = db.Column(db.String(100), nullable=False)
+    credential_type = db.Column(db.String(50), nullable=False)  # SSH, API, SSO, etc.
+    
     password = db.Column(db.String(255))
     
-    credential_type = db.Column(db.String(50))  # SSH, API, SSO, etc.
     account_type = db.Column(db.String(50))     # USER, SERVICE, SYSTEM, etc.
     resource_type = db.Column(db.String(50))    # ESXI, VCENTER, NSX_MANAGER, etc.
     domain_name = db.Column(db.String(100))

@@ -46,17 +46,30 @@ class VCFCredentialFetcher:
             logger.debug(f"Successfully obtained token from {host}")
             return token
         except requests.exceptions.SSLError as e:
-            logger.error(f"SSL Error connecting to {host}: {e}")
-            logger.debug(f"SSL verify was set to: {ssl_verify}")
+            logger.error(f"SSL Error connecting to {host} - try disabling SSL verification")
             raise
-        except requests.exceptions.Timeout as e:
-            logger.error(f"Timeout connecting to {host}: {e}")
+        except requests.exceptions.Timeout:
+            logger.error(f"Connection timed out to {host}")
             raise
         except requests.exceptions.ConnectionError as e:
-            logger.error(f"Connection error to {host}: {e}")
+            # Extract useful info from connection error
+            error_str = str(e)
+            if "Connection refused" in error_str:
+                logger.error(f"Connection refused to {host} - server may be down")
+            elif "Name or service not known" in error_str or "getaddrinfo failed" in error_str:
+                logger.error(f"Host not found: {host} - check hostname")
+            else:
+                logger.error(f"Connection failed to {host} - check network connectivity")
+            raise
+        except requests.exceptions.HTTPError as e:
+            response = getattr(e, 'response', None)
+            if response is not None and response.status_code == 401:
+                logger.error(f"Authentication failed for {host} - check credentials")
+            else:
+                logger.error(f"HTTP error from {host}: {response.status_code if response else 'unknown'}")
             raise
         except Exception as e:
-            logger.error(f"Error getting token from {host}: {e}")
+            logger.error(f"Error getting token from {host}: {type(e).__name__}")
             raise
     
     def fetch_from_installer(self, host: str, username: str, password: str, ssl_verify: bool = False) -> List[Dict]:
@@ -108,7 +121,11 @@ class VCFCredentialFetcher:
             return credentials
             
         except Exception as e:
-            logger.error(f"Error fetching from installer {host}: {e}", exc_info=True)
+            # Don't log full traceback for expected connection errors
+            if isinstance(e, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, 
+                            requests.exceptions.SSLError, requests.exceptions.HTTPError)):
+                raise  # Already logged in _get_token
+            logger.error(f"Error fetching from installer {host}: {type(e).__name__}: {str(e)[:100]}")
             raise
     
     def _parse_installer_spec(self, spec_data: Dict) -> List[Dict]:

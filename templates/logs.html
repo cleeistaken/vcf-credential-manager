@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="logs-container">
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+                ← Back to Dashboard
+            </a>
+            <h1>System Logs</h1>
+            <p class="p6">View and export application log files</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="exportAllLogs()">
+                📦 Export All Logs (tar.gz)
+            </button>
+        </div>
+    </div>
+    
+    <div class="logs-layout">
+        <!-- Log Files List -->
+        <div class="log-files-panel">
+            <h2>📁 Log Files</h2>
+            <div id="log-files-list" class="log-files-list">
+                <div class="loading">Loading log files...</div>
+            </div>
+        </div>
+        
+        <!-- Log Content Viewer -->
+        <div class="log-viewer-panel">
+            <div class="log-viewer-header">
+                <h2 id="log-viewer-title">Select a log file</h2>
+                <div class="log-viewer-actions" id="log-viewer-actions" style="display: none;">
+                    <select id="lines-select" onchange="loadLogContent(currentLogFile)">
+                        <option value="100">Last 100 lines</option>
+                        <option value="500" selected>Last 500 lines</option>
+                        <option value="1000">Last 1000 lines</option>
+                        <option value="5000">Last 5000 lines</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline" onclick="refreshLog()">🔄 Refresh</button>
+                    <button class="btn btn-sm btn-outline" onclick="downloadCurrentLog()">📥 Download</button>
+                </div>
+            </div>
+            <div id="log-content" class="log-content">
+                <p class="placeholder-text">Select a log file from the list to view its contents.</p>
+            </div>
+            <div id="log-info" class="log-info" style="display: none;">
+                Showing <span id="showing-lines">0</span> of <span id="total-lines">0</span> lines
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .logs-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .header-content h1 {
+        margin: 0.5rem 0 0.25rem 0;
+        font-size: 1.75rem;
+    }
+    
+    .header-content .p6 {
+        color: #666;
+        margin: 0;
+    }
+    
+    .logs-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 1.5rem;
+        min-height: 600px;
+    }
+    
+    .log-files-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .log-files-panel h2 {
+        margin: 0 0 1rem 0;
+        font-size: 1.1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .log-files-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .log-file-item {
+        padding: 0.75rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .log-file-item:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .log-file-item.active {
+        background-color: #e8f4fc;
+        border-color: #0079b8;
+    }
+    
+    .log-file-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+        word-break: break-all;
+    }
+    
+    .log-file-meta {
+        font-size: 0.75rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    .log-viewer-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .log-viewer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e0e0e0;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .log-viewer-header h2 {
+        margin: 0;
+        font-size: 1.1rem;
+    }
+    
+    .log-viewer-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    
+    .log-viewer-actions select {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+    }
+    
+    .log-content {
+        flex: 1;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 0.8rem;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        min-height: 400px;
+        max-height: 700px;
+    }
+    
+    .log-content .placeholder-text {
+        color: #888;
+        font-style: italic;
+    }
+    
+    .log-info {
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #666;
+        text-align: right;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #666;
+    }
+    
+    /* Log level highlighting */
+    .log-error { color: #f48771; }
+    .log-warning { color: #dcdcaa; }
+    .log-info { color: #9cdcfe; }
+    .log-debug { color: #808080; }
+    
+    /* Responsive */
+    @media (max-width: 900px) {
+        .logs-layout {
+            grid-template-columns: 1fr;
+        }
+        
+        .log-files-panel {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    }
+</style>
+
+<script>
+let currentLogFile = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadLogFiles();
+});
+
+async function loadLogFiles() {
+    try {
+        const response = await fetch('/api/logs');
+        const data = await response.json();
+        
+        const container = document.getElementById('log-files-list');
+        
+        if (data.logs.length === 0) {
+            container.innerHTML = '<p class="placeholder-text">No log files found.</p>';
+            return;
+        }
+        
+        container.innerHTML = data.logs.map(log => `
+            <div class="log-file-item" onclick="selectLogFile('${log.name}')" id="log-item-${log.name.replace(/\./g, '-')}">
+                <div class="log-file-name">${log.name}</div>
+                <div class="log-file-meta">${log.size_human} • ${log.modified_human}</div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Error loading log files:', error);
+        document.getElementById('log-files-list').innerHTML = 
+            '<p class="placeholder-text" style="color: #c92100;">Error loading log files.</p>';
+    }
+}
+
+function selectLogFile(filename) {
+    // Update active state
+    document.querySelectorAll('.log-file-item').forEach(el => el.classList.remove('active'));
+    const itemId = 'log-item-' + filename.replace(/\./g, '-');
+    const item = document.getElementById(itemId);
+    if (item) item.classList.add('active');
+    
+    currentLogFile = filename;
+    loadLogContent(filename);
+}
+
+async function loadLogContent(filename) {
+    const lines = document.getElementById('lines-select').value;
+    
+    document.getElementById('log-viewer-title').textContent = filename;
+    document.getElementById('log-content').innerHTML = '<div class="loading">Loading...</div>';
+    document.getElementById('log-viewer-actions').style.display = 'flex';
+    document.getElementById('log-info').style.display = 'block';
+    
+    try {
+        const response = await fetch(`/api/logs/${encodeURIComponent(filename)}?lines=${lines}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            document.getElementById('log-content').innerHTML = 
+                `<p class="placeholder-text" style="color: #f48771;">Error: ${data.error}</p>`;
+            return;
+        }
+        
+        // Highlight log levels
+        let content = escapeHtml(data.content);
+        content = content.replace(/\bERROR\b/g, '<span class="log-error">ERROR</span>');
+        content = content.replace(/\bWARNING\b/g, '<span class="log-warning">WARNING</span>');
+        content = content.replace(/\bINFO\b/g, '<span class="log-info">INFO</span>');
+        content = content.replace(/\bDEBUG\b/g, '<span class="log-debug">DEBUG</span>');
+        
+        document.getElementById('log-content').innerHTML = content || '<p class="placeholder-text">Log file is empty.</p>';
+        document.getElementById('showing-lines').textContent = data.showing_lines;
+        document.getElementById('total-lines').textContent = data.total_lines;
+        
+        // Scroll to bottom
+        const logContent = document.getElementById('log-content');
+        logContent.scrollTop = logContent.scrollHeight;
+        
+    } catch (error) {
+        console.error('Error loading log content:', error);
+        document.getElementById('log-content').innerHTML = 
+            '<p class="placeholder-text" style="color: #f48771;">Error loading log content.</p>';
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function refreshLog() {
+    if (currentLogFile) {
+        loadLogContent(currentLogFile);
+    }
+}
+
+function downloadCurrentLog() {
+    if (currentLogFile) {
+        window.location.href = `/api/logs/${encodeURIComponent(currentLogFile)}/download`;
+    }
+}
+
+function exportAllLogs() {
+    window.location.href = '/api/logs/export';
+}
+</script>
+{% endblock %}

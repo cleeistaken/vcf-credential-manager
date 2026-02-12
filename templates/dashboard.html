@@ -7,10 +7,13 @@
     <h1>Environments</h1>
     <p class="p6">Manage your VCF environments and credentials</p>
     
-    <div style="margin: 1rem 0;">
+    <div style="margin: 1rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
         {% if current_user.role != 'readonly' %}
         <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
             ➕ Add Environment
+        </button>
+        <button class="btn btn-outline" onclick="openImportModal()">
+            📤 Import from File
         </button>
         {% else %}
         <div class="alert alert-info">
@@ -36,26 +39,43 @@
                             {% if env.installer_host %}
                             <div class="info-item">
                                 <span>🖥️ Installer: {{ env.installer_host }}</span>
+                                {% if env.installer_error %}
+                                <span class="error-badge" title="{{ env.installer_error }}">⚠️ {{ env.installer_error[:30] }}{% if env.installer_error|length > 30 %}...{% endif %}</span>
+                                {% endif %}
                             </div>
                             {% endif %}
                             
                             {% if env.manager_host %}
                             <div class="info-item">
                                 <span>🖥️ Manager: {{ env.manager_host }}</span>
+                                {% if env.manager_error %}
+                                <span class="error-badge" title="{{ env.manager_error }}">⚠️ {{ env.manager_error[:30] }}{% if env.manager_error|length > 30 %}...{% endif %}</span>
+                                {% endif %}
                             </div>
                             {% endif %}
                             
                             <div class="info-item">
-                                <span>🕐 Sync: {{ 'Enabled' if env.sync_enabled else 'Disabled' }}
-                                    {% if env.sync_enabled %}({{ env.sync_interval_minutes }}m){% endif %}
+                                <span>🕐 Sync: 
+                                    {% if env.installer_sync_enabled or env.manager_sync_enabled %}
+                                        {% if env.installer_sync_enabled %}Installer: {{ env.installer_sync_interval_minutes }}m{% endif %}
+                                        {% if env.installer_sync_enabled and env.manager_sync_enabled %} | {% endif %}
+                                        {% if env.manager_sync_enabled %}Manager: {{ env.manager_sync_interval_minutes }}m{% endif %}
+                                    {% else %}
+                                        Disabled
+                                    {% endif %}
                                 </span>
                             </div>
                             
-                            {% if env.last_sync %}
-                            <div class="info-item">
-                                <span>🔄 Last sync: {{ env.last_sync.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <div class="info-item" id="last-sync-{{ env.id }}">
+                                {% if env.last_sync %}
+                                <span class="{% if env.last_sync_status == 'failed' %}sync-failed{% elif env.last_sync_status == 'partial' %}sync-partial{% endif %}">
+                                    🔄 Last sync: {{ env.last_sync.strftime('%Y-%m-%d %H:%M') }}
+                                    {% if env.last_sync_status == 'failed' %} (failed){% elif env.last_sync_status == 'partial' %} (partial){% endif %}
+                                </span>
+                                {% else %}
+                                <span>🔄 Last sync: Never</span>
+                                {% endif %}
                             </div>
-                            {% endif %}
                             
                             <div class="info-item">
                                 <span>🔑 <span id="cred-count-{{ env.id }}">Loading credentials...</span></span>
@@ -191,18 +211,36 @@
                         </section>
                         
                         <section class="form-block">
-                            <label>Sync Configuration</label>
+                            <label>Installer Sync Configuration</label>
                             
                             <div class="form-group">
                                 <label style="display: flex; align-items: center;">
-                                    <input type="checkbox" id="sync-enabled" name="sync_enabled" style="margin-right: 0.5rem;">
-                                    Enable automatic sync
+                                    <input type="checkbox" id="installer-sync-enabled" name="installer_sync_enabled" style="margin-right: 0.5rem;">
+                                    Enable automatic installer sync
                                 </label>
                             </div>
                             
                             <div class="form-group">
-                                <label for="sync-interval">Sync Interval (minutes)</label>
-                                <input type="number" id="sync-interval" name="sync_interval_minutes" value="60" min="5" class="form-control">
+                                <label for="installer-sync-interval">Installer Sync Interval (minutes)</label>
+                                <input type="number" id="installer-sync-interval" name="installer_sync_interval_minutes" value="0" min="0" class="form-control">
+                                <small class="form-text text-muted">Set to 0 to disable. Default: disabled (installer credentials rarely change)</small>
+                            </div>
+                        </section>
+                        
+                        <section class="form-block">
+                            <label>Manager Sync Configuration</label>
+                            
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center;">
+                                    <input type="checkbox" id="manager-sync-enabled" name="manager_sync_enabled" checked style="margin-right: 0.5rem;">
+                                    Enable automatic manager sync
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="manager-sync-interval">Manager Sync Interval (minutes)</label>
+                                <input type="number" id="manager-sync-interval" name="manager_sync_interval_minutes" value="60" min="0" class="form-control">
+                                <small class="form-text text-muted">Set to 0 to disable. Default: 60 minutes</small>
                             </div>
                         </section>
                     </form>
@@ -218,6 +256,81 @@
         </div>
     </div>
 </clr-modal>
+
+<!-- Import Environment Modal -->
+<div class="modal" id="import-modal" style="display: none;">
+    <div class="modal-dialog" role="dialog" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Import Environment from File</h3>
+                <button aria-label="Close" class="close" type="button" onclick="closeImportModal()">
+                    ✕
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Upload a JSON or YAML file containing environment configuration. The file will be validated and connections will be tested before creating the environment.</p>
+                
+                <section class="form-block">
+                    <label>Select File</label>
+                    <div class="form-group">
+                        <input type="file" id="import-file" accept=".json,.yaml,.yml" class="form-control" onchange="previewImportFile()">
+                        <small class="form-text text-muted">Supported formats: JSON (.json), YAML (.yaml, .yml)</small>
+                    </div>
+                </section>
+                
+                <section class="form-block" id="import-preview-section" style="display: none;">
+                    <label>File Preview</label>
+                    <pre id="import-preview" style="background: #f5f5f5; padding: 1rem; border-radius: 4px; max-height: 300px; overflow: auto; font-size: 0.85rem;"></pre>
+                </section>
+                
+                <section class="form-block" id="import-validation-section" style="display: none;">
+                    <label>Validation Results</label>
+                    <div id="import-validation-results"></div>
+                </section>
+                
+                <details style="margin-top: 1rem;">
+                    <summary style="cursor: pointer; color: #0072a3;">View file format examples</summary>
+                    <div style="margin-top: 1rem;">
+                        <h5>JSON Format:</h5>
+                        <pre style="background: #f5f5f5; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem;">{
+  "name": "Production VCF",
+  "description": "Production environment",
+  "installer_host": "vcf-installer.example.com",
+  "installer_username": "admin",
+  "installer_password": "password123",
+  "installer_ssl_verify": false,
+  "manager_host": "sddc-manager.example.com",
+  "manager_username": "administrator@vsphere.local",
+  "manager_password": "password123",
+  "manager_ssl_verify": false,
+  "sync_enabled": true,
+  "sync_interval_minutes": 60
+}</pre>
+                        <h5 style="margin-top: 1rem;">YAML Format:</h5>
+                        <pre style="background: #f5f5f5; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem;">name: Production VCF
+description: Production environment
+installer_host: vcf-installer.example.com
+installer_username: admin
+installer_password: password123
+installer_ssl_verify: false
+manager_host: sddc-manager.example.com
+manager_username: administrator@vsphere.local
+manager_password: password123
+manager_ssl_verify: false
+sync_enabled: true
+sync_interval_minutes: 60</pre>
+                    </div>
+                </details>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" type="button" onclick="closeImportModal()">Cancel</button>
+                <button class="btn btn-primary" type="button" onclick="validateAndImport()" id="import-btn" disabled>
+                    Validate & Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_css %}
@@ -259,6 +372,28 @@
     
     .btn-danger {
         color: #c92100 !important;
+    }
+    
+    /* Error and sync status styles */
+    .error-badge {
+        display: block;
+        color: #c92100;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+        padding: 0.2rem 0.4rem;
+        background-color: #fff0f0;
+        border-radius: 3px;
+        border-left: 3px solid #c92100;
+    }
+    
+    .sync-failed {
+        color: #c92100;
+        font-weight: 500;
+    }
+    
+    .sync-partial {
+        color: #e67300;
+        font-weight: 500;
     }
     
     /* Modal centered on page */
@@ -359,6 +494,30 @@
     
     input:checked + .toggle-slider:hover {
         background-color: #005a82;
+    }
+    
+    /* Alert styles for import modal */
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    
+    .alert-success {
+        background-color: #dff0d8;
+        border: 1px solid #3e8635;
+        color: #2d6a28;
+    }
+    
+    .alert-danger {
+        background-color: #f2dede;
+        border: 1px solid #c92100;
+        color: #a94442;
+    }
+    
+    .alert ul {
+        margin: 0.5rem 0 0 1.5rem;
+        padding: 0;
     }
 </style>
 {% endblock %}

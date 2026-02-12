@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Server Management - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('settings') }}" class="btn btn-outline">
+                ← Back to Settings
+            </a>
+            <h1>🖥️ Server Management</h1>
+            <p class="p6">Restart server and view system status</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Scheduler Status</h3>
+        <div id="scheduler-status">
+            <p class="text-muted">Loading scheduler status...</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Restart Server</h3>
+        <p>Restart the Gunicorn server to apply new SSL certificates or configuration changes.</p>
+        
+        <div class="alert alert-warning">
+            <strong>⚠ Warning:</strong> Restarting the server will:
+            <ul>
+                <li>Disconnect all active users (they will need to log in again)</li>
+                <li>Reload SSL certificates</li>
+                <li>Apply any configuration changes</li>
+                <li>Take approximately 5-10 seconds</li>
+            </ul>
+        </div>
+        
+        <button class="btn btn-danger" onclick="restartServer()">
+            🔄 Restart Server
+        </button>
+        
+        <div id="restart-status" style="display: none; margin-top: 1rem;"></div>
+    </div>
+    
+    <div class="card">
+        <h3>System Information</h3>
+        <table class="info-table">
+            <tr>
+                <th>Application:</th>
+                <td>VCF Credentials Manager</td>
+            </tr>
+            <tr>
+                <th>Python Version:</th>
+                <td id="python-version">Loading...</td>
+            </tr>
+            <tr>
+                <th>Database:</th>
+                <td>SQLite</td>
+            </tr>
+            <tr>
+                <th>Log Directory:</th>
+                <td><code>logs/</code></td>
+            </tr>
+            <tr>
+                <th>SSL Directory:</th>
+                <td><code>ssl/</code></td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        padding: 2rem;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        margin-bottom: 2rem;
+    }
+    
+    .page-header h1 {
+        margin: 0.5rem 0;
+    }
+    
+    .page-header .p6 {
+        color: #666;
+        margin: 0;
+    }
+    
+    .card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .card h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+    
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    
+    .alert-info {
+        background-color: #e1f5fe;
+        border-left: 4px solid #0072a3;
+        color: #01579b;
+    }
+    
+    .alert-warning {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        color: #856404;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        border-left: 4px solid #28a745;
+        color: #155724;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+        color: #721c24;
+    }
+    
+    .alert ul {
+        margin: 0.5rem 0 0 1.5rem;
+    }
+    
+    .text-muted {
+        color: #666;
+    }
+    
+    .btn-danger {
+        background-color: #c92100 !important;
+        color: white !important;
+        border: 1px solid #c92100 !important;
+        font-weight: bold !important;
+    }
+    
+    .btn-danger:hover {
+        background-color: #a01a00 !important;
+        border-color: #a01a00 !important;
+    }
+    
+    .info-table {
+        width: 100%;
+    }
+    
+    .info-table th {
+        text-align: left;
+        padding: 0.5rem;
+        width: 150px;
+        color: #555;
+        vertical-align: top;
+    }
+    
+    .info-table td {
+        padding: 0.5rem;
+    }
+    
+    .info-table code {
+        background: #f5f5f5;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        font-size: 0.9rem;
+    }
+    
+    .scheduler-jobs {
+        margin-top: 1rem;
+    }
+    
+    .scheduler-job {
+        background: #f9f9f9;
+        padding: 0.75rem;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .scheduler-job-name {
+        font-weight: 500;
+        color: #333;
+    }
+    
+    .scheduler-job-next {
+        color: #666;
+        font-size: 0.85rem;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-running {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-stopped {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadSchedulerStatus() {
+        try {
+            const response = await fetch('/api/scheduler/status');
+            if (response.ok) {
+                const data = await response.json();
+                const statusDiv = document.getElementById('scheduler-status');
+                
+                let html = `
+                    <p>
+                        <strong>Status:</strong> 
+                        <span class="status-badge ${data.running ? 'status-running' : 'status-stopped'}">
+                            ${data.running ? 'Running' : 'Stopped'}
+                        </span>
+                    </p>
+                    <p><strong>Scheduled Jobs:</strong> ${data.job_count}</p>
+                `;
+                
+                if (data.jobs && data.jobs.length > 0) {
+                    html += '<div class="scheduler-jobs">';
+                    for (const job of data.jobs) {
+                        const nextRun = job.next_run_time ? new Date(job.next_run_time).toLocaleString() : 'Not scheduled';
+                        html += `
+                            <div class="scheduler-job">
+                                <div class="scheduler-job-name">${job.id}</div>
+                                <div class="scheduler-job-next">Next run: ${nextRun}</div>
+                            </div>
+                        `;
+                    }
+                    html += '</div>';
+                }
+                
+                statusDiv.innerHTML = html;
+            }
+        } catch (error) {
+            console.error('Error loading scheduler status:', error);
+            document.getElementById('scheduler-status').innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
+        }
+    }
+    
+    async function restartServer() {
+        if (!confirm('Are you sure you want to restart the server?\n\nAll users will be disconnected and need to log in again.\n\nThis will take approximately 5-10 seconds.')) {
+            return;
+        }
+        
+        const statusDiv = document.getElementById('restart-status');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'alert alert-info';
+        statusDiv.innerHTML = '🔄 Restarting server... Please wait...';
+        
+        try {
+            const response = await fetch('/api/restart-server', {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                statusDiv.className = 'alert alert-success';
+                statusDiv.innerHTML = '✓ Server restart initiated. You will be redirected to the login page in 5 seconds...';
+                
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 5000);
+            } else {
+                const data = await response.json();
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.innerHTML = `✕ Failed to restart server: ${data.error || 'Unknown error'}`;
+            }
+        } catch (error) {
+            console.error('Error restarting server:', error);
+            statusDiv.className = 'alert alert-danger';
+            statusDiv.innerHTML = '✕ Failed to restart server. Please try again or restart manually.';
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSchedulerStatus();
+        
+        // Set Python version
+        document.getElementById('python-version').textContent = '{{ python_version }}';
+    });
+</script>
+{% endblock %}

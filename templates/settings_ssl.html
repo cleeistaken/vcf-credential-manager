@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}SSL Certificates - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('settings') }}" class="btn btn-outline">
+                ← Back to Settings
+            </a>
+            <h1>🔒 SSL Certificate Management</h1>
+            <p class="p6">Upload and manage SSL certificates for HTTPS</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Current Certificate Information</h3>
+        <div id="cert-info">
+            <p class="text-muted">Loading certificate information...</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Upload SSL Certificates</h3>
+        <form method="POST" action="{{ url_for('upload_ssl_certificates') }}" enctype="multipart/form-data" class="ssl-form" id="ssl-upload-form">
+            <div class="alert alert-info">
+                <strong>⚠️ Important:</strong> The server must be restarted after uploading new certificates for changes to take effect.
+            </div>
+            
+            <div class="form-group">
+                <label for="cert_file">Certificate File (.crt or .pem)</label>
+                <input type="file" id="cert_file" name="cert_file" accept=".crt,.pem" required>
+                <span class="form-hint">Upload your SSL certificate file</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="key_file">Private Key File (.key or .pem)</label>
+                <input type="file" id="key_file" name="key_file" accept=".key,.pem" required>
+                <span class="form-hint">Upload your private key file</span>
+            </div>
+            
+            <div class="alert alert-warning">
+                <strong>Validation:</strong> Certificates will be validated before being saved. The system will verify:
+                <ul>
+                    <li>Certificate is valid and properly formatted</li>
+                    <li>Private key is valid and properly formatted</li>
+                    <li>Certificate and private key match</li>
+                </ul>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">📤 Upload Certificates</button>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Certificate Requirements</h3>
+        <p>For production use, you should use a certificate signed by a trusted Certificate Authority (CA). Self-signed certificates will show browser warnings.</p>
+        
+        <h4>Supported Formats</h4>
+        <ul>
+            <li><strong>Certificate:</strong> PEM format (.crt or .pem)</li>
+            <li><strong>Private Key:</strong> PEM format, unencrypted (.key or .pem)</li>
+        </ul>
+        
+        <h4>Generate a Self-Signed Certificate</h4>
+        <p>For testing, you can generate a self-signed certificate using the provided script:</p>
+        <pre class="code-block">./tools/regenerate_ssl_cert.sh</pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        padding: 2rem;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        margin-bottom: 2rem;
+    }
+    
+    .page-header h1 {
+        margin: 0.5rem 0;
+    }
+    
+    .page-header .p6 {
+        color: #666;
+        margin: 0;
+    }
+    
+    .card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .card h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+    
+    .card h4 {
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: #555;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+    
+    .form-group input[type="file"] {
+        display: block;
+        margin-top: 0.5rem;
+    }
+    
+    .form-hint {
+        display: block;
+        font-size: 0.875rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    .ssl-form {
+        max-width: 600px;
+    }
+    
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    
+    .alert-info {
+        background-color: #e1f5fe;
+        border-left: 4px solid #0072a3;
+        color: #01579b;
+    }
+    
+    .alert-warning {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        color: #856404;
+    }
+    
+    .alert ul {
+        margin: 0.5rem 0 0 1.5rem;
+    }
+    
+    .text-muted {
+        color: #666;
+    }
+    
+    .code-block {
+        background: #f5f5f5;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9rem;
+        overflow-x: auto;
+    }
+    
+    #cert-info table {
+        width: 100%;
+    }
+    
+    #cert-info th {
+        text-align: left;
+        padding: 0.5rem;
+        width: 150px;
+        color: #555;
+    }
+    
+    #cert-info td {
+        padding: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadCertInfo() {
+        try {
+            const response = await fetch('/api/ssl-info');
+            if (response.ok) {
+                const data = await response.json();
+                const certInfo = document.getElementById('cert-info');
+                
+                if (data.exists) {
+                    certInfo.innerHTML = `
+                        <table>
+                            <tr>
+                                <th>Subject:</th>
+                                <td>${data.subject || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Issuer:</th>
+                                <td>${data.issuer || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Valid From:</th>
+                                <td>${data.valid_from || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Valid Until:</th>
+                                <td>${data.valid_until || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Days Remaining:</th>
+                                <td>${data.days_remaining || 'N/A'}</td>
+                            </tr>
+                        </table>
+                    `;
+                } else {
+                    certInfo.innerHTML = '<p class="text-muted">No SSL certificate found. Using default self-signed certificate.</p>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading certificate info:', error);
+            document.getElementById('cert-info').innerHTML = '<p class="text-muted">Unable to load certificate information</p>';
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', loadCertInfo);
+</script>
+{% endblock %}

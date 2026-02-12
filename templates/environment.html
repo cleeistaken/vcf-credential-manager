@@ -27,6 +27,17 @@
             <button class="btn btn-sm btn-success-outline" onclick="exportExcel()">
                 📊 Export Excel
             </button>
+            {% if current_user.role == 'admin' or current_user.is_admin %}
+            <div class="dropdown" style="position: relative; display: inline-block;">
+                <button class="btn btn-sm btn-outline" onclick="toggleExportConfigDropdown()">
+                    ⚙️ Export Config ▾
+                </button>
+                <div id="export-config-dropdown" class="dropdown-menu" style="display: none;">
+                    <a href="#" onclick="exportConfigJSON(); return false;">📄 JSON Format</a>
+                    <a href="#" onclick="exportConfigYAML(); return false;">📄 YAML Format</a>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
     
@@ -461,6 +472,36 @@
         background-color: #0052a3;
         border-color: #0052a3;
     }
+    
+    /* Dropdown styles */
+    .dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        min-width: 150px;
+        z-index: 1000;
+    }
+    
+    .dropdown-menu a {
+        display: block;
+        padding: 0.5rem 1rem;
+        color: #333;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+    
+    .dropdown-menu a:hover {
+        background-color: #f5f5f5;
+    }
 </style>
 {% endblock %}
 
@@ -778,6 +819,30 @@
             closeHistoryModal();
         }
     });
+    
+    // Export Config Functions (Admin only)
+    function toggleExportConfigDropdown() {
+        const dropdown = document.getElementById('export-config-dropdown');
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('export-config-dropdown');
+        if (dropdown && !event.target.closest('.dropdown')) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    function exportConfigJSON() {
+        window.location.href = `/api/environments/${environmentId}/export/config?format=json`;
+        document.getElementById('export-config-dropdown').style.display = 'none';
+    }
+    
+    function exportConfigYAML() {
+        window.location.href = `/api/environments/${environmentId}/export/config?format=yaml`;
+        document.getElementById('export-config-dropdown').style.display = 'none';
+    }
 </script>
 {% endblock %}
 
