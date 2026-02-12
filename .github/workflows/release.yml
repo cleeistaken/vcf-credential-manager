@@ -63,11 +63,13 @@ jobs:
           -x "ssl/*.key" \
           -x "ssl/*.crt" \
           -x "*.db" \
-          -x "Pipfile.lock"
+          -x "Pipfile.lock" \
+          -x "tools/*"
 
     - name: Create tarball archive
       run: |
         # Create a tarball for Linux users
+        # Use --ignore-failed-read and || true to handle "file changed as we read it" warnings
         tar --exclude='.git' \
             --exclude='.idea' \
             --exclude='__pycache__' \
@@ -82,7 +84,11 @@ jobs:
             --exclude='ssl/*.crt' \
             --exclude='*.db' \
             --exclude='Pipfile.lock' \
-            -czvf vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz .
+            --exclude='tools' \
+            --exclude='*.zip' \
+            --exclude='*.tar.gz' \
+            --ignore-failed-read \
+            -czvf vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz . || [[ $? -eq 1 ]]
 
     - name: Generate release notes
       id: release_notes
