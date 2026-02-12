@@ -4,321 +4,334 @@
 
 {% block content %}
 <div class="dashboard-container">
-    <h1>Environments</h1>
-    <p class="p6">Manage your VCF environments and credentials</p>
-    
-    <div style="margin: 1rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-        {% if current_user.role != 'readonly' %}
-        <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
-            ➕ Add Environment
-        </button>
-        <button class="btn btn-outline" onclick="openImportModal()">
-            📤 Import from File
-        </button>
-        {% else %}
-        <div class="alert alert-info">
-            You are logged in as a read-only user. You can view credentials but cannot modify environments.
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1>Environments</h1>
+            <p class="header-description">Manage your VCF environments and credentials</p>
         </div>
-        {% endif %}
+        <div class="header-actions btn-group">
+            {% if current_user.role != 'readonly' %}
+            <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
+                <span class="btn-icon">+</span> Add Environment
+            </button>
+            <button class="btn btn-outline" onclick="openImportModal()">
+                <span class="btn-icon">↑</span> Import from File
+            </button>
+            {% endif %}
+        </div>
     </div>
     
-    <div class="clr-row" id="environments-grid">
+    {% if current_user.role == 'readonly' %}
+    <div class="alert alert-info">
+        You are logged in as a read-only user. You can view credentials but cannot modify environments.
+    </div>
+    {% endif %}
+    
+    <!-- Environments Grid -->
+    <div class="env-grid" id="environments-grid">
         {% for env in environments %}
-        <div class="clr-col-lg-4 clr-col-md-6 clr-col-12">
-            <div class="card environment-card" data-env-id="{{ env.id }}">
-                <div class="card-header">
-                    <h3>{{ env.name }}</h3>
-                </div>
-                <div class="card-block">
-                    <div class="card-text">
-                        {% if env.description %}
-                        <p>{{ env.description }}</p>
-                        {% endif %}
-                        
-                        <div class="env-info">
-                            {% if env.installer_host %}
-                            <div class="info-item">
-                                <span>🖥️ Installer: {{ env.installer_host }}</span>
-                                {% if env.installer_error %}
-                                <span class="error-badge" title="{{ env.installer_error }}">⚠️ {{ env.installer_error[:30] }}{% if env.installer_error|length > 30 %}...{% endif %}</span>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                            
-                            {% if env.manager_host %}
-                            <div class="info-item">
-                                <span>🖥️ Manager: {{ env.manager_host }}</span>
-                                {% if env.manager_error %}
-                                <span class="error-badge" title="{{ env.manager_error }}">⚠️ {{ env.manager_error[:30] }}{% if env.manager_error|length > 30 %}...{% endif %}</span>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                            
-                            <div class="info-item">
-                                <span>🕐 Sync: 
-                                    {% if env.installer_sync_enabled or env.manager_sync_enabled %}
-                                        {% if env.installer_sync_enabled %}Installer: {{ env.installer_sync_interval_minutes }}m{% endif %}
-                                        {% if env.installer_sync_enabled and env.manager_sync_enabled %} | {% endif %}
-                                        {% if env.manager_sync_enabled %}Manager: {{ env.manager_sync_interval_minutes }}m{% endif %}
-                                    {% else %}
-                                        Disabled
-                                    {% endif %}
-                                </span>
-                            </div>
-                            
-                            <div class="info-item" id="last-sync-{{ env.id }}">
-                                {% if env.last_sync %}
-                                <span class="{% if env.last_sync_status == 'failed' %}sync-failed{% elif env.last_sync_status == 'partial' %}sync-partial{% endif %}">
-                                    🔄 Last sync: {{ env.last_sync.strftime('%Y-%m-%d %H:%M') }}
-                                    {% if env.last_sync_status == 'failed' %} (failed){% elif env.last_sync_status == 'partial' %} (partial){% endif %}
-                                </span>
-                                {% else %}
-                                <span>🔄 Last sync: Never</span>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="info-item">
-                                <span>🔑 <span id="cred-count-{{ env.id }}">Loading credentials...</span></span>
-                            </div>
-                        </div>
+        <div class="env-card" data-env-id="{{ env.id }}">
+            <!-- Card Header -->
+            <div class="env-card-header">
+                <h3 class="env-card-title">{{ env.name }}</h3>
+                {% if env.last_sync_status == 'failed' %}
+                <span class="status-badge status-danger">Failed</span>
+                {% elif env.last_sync_status == 'partial' %}
+                <span class="status-badge status-warning">Partial</span>
+                {% elif env.last_sync %}
+                <span class="status-badge status-success">Synced</span>
+                {% endif %}
+            </div>
+            
+            {% if env.description %}
+            <p class="env-card-description">{{ env.description }}</p>
+            {% endif %}
+            
+            <!-- Info Grid -->
+            <div class="env-info-grid">
+                {% if env.installer_host %}
+                <div class="env-info-item">
+                    <div class="env-info-label">VCF Installer</div>
+                    <div class="env-info-value">{{ env.installer_host }}</div>
+                    {% if env.installer_error %}
+                    <div class="env-info-error">
+                        <span class="error-icon">⚠</span> {{ env.installer_error[:40] }}{% if env.installer_error|length > 40 %}...{% endif %}
                     </div>
-                </div>
-                <div class="card-footer">
-                    <button class="btn btn-sm btn-link" onclick="viewEnvironment({{ env.id }})">
-                        👁️ View Credentials
-                    </button>
-                    {% if current_user.role != 'readonly' %}
-                    <button class="btn btn-sm btn-link" onclick="syncEnvironment({{ env.id }})">
-                        🔄 Sync Now
-                    </button>
-                    <button class="btn btn-sm btn-link" onclick="editEnvironment({{ env.id }})">
-                        ✏️ Edit
-                    </button>
-                    <button class="btn btn-sm btn-link btn-danger" onclick="deleteEnvironment({{ env.id }}, '{{ env.name }}')">
-                        🗑️ Delete
-                    </button>
                     {% endif %}
                 </div>
+                {% endif %}
+                
+                {% if env.manager_host %}
+                <div class="env-info-item">
+                    <div class="env-info-label">SDDC Manager</div>
+                    <div class="env-info-value">{{ env.manager_host }}</div>
+                    {% if env.manager_error %}
+                    <div class="env-info-error">
+                        <span class="error-icon">⚠</span> {{ env.manager_error[:40] }}{% if env.manager_error|length > 40 %}...{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Stats Row -->
+            <div class="env-stats">
+                <div class="env-stat">
+                    <span class="env-stat-icon">🔑</span>
+                    <span class="env-stat-value" id="cred-count-{{ env.id }}">--</span>
+                    <span class="env-stat-label">credentials</span>
+                </div>
+                <div class="env-stat">
+                    <span class="env-stat-icon">🕐</span>
+                    <span class="env-stat-value {% if env.last_sync_status == 'failed' %}text-danger{% elif env.last_sync_status == 'partial' %}text-warning{% endif %}" id="last-sync-{{ env.id }}">
+                        {% if env.last_sync %}{{ env.last_sync.strftime('%m/%d %H:%M') }}{% else %}Never{% endif %}
+                    </span>
+                    <span class="env-stat-label">last sync</span>
+                </div>
+                <div class="env-stat">
+                    <span class="env-stat-icon">⏱</span>
+                    <span class="env-stat-value">
+                        {% if env.installer_sync_enabled or env.manager_sync_enabled %}
+                            {% if env.manager_sync_enabled %}{{ env.manager_sync_interval_minutes }}m{% else %}Off{% endif %}
+                        {% else %}
+                            Off
+                        {% endif %}
+                    </span>
+                    <span class="env-stat-label">auto sync</span>
+                </div>
+            </div>
+            
+            <!-- Card Actions -->
+            <div class="env-card-actions">
+                <button class="btn btn-primary btn-sm" onclick="viewEnvironment({{ env.id }})">
+                    View Credentials
+                </button>
+                {% if current_user.role != 'readonly' %}
+                <div class="btn-group-overflow">
+                    <button class="btn btn-outline btn-sm" onclick="toggleEnvActions({{ env.id }})">
+                        Actions <span class="caret">▾</span>
+                    </button>
+                    <div class="dropdown-menu" id="env-actions-{{ env.id }}">
+                        <button class="dropdown-item" onclick="syncEnvironment({{ env.id }})">
+                            <span class="dropdown-icon">🔄</span> Sync Now
+                        </button>
+                        <button class="dropdown-item" onclick="editEnvironment({{ env.id }})">
+                            <span class="dropdown-icon">✏️</span> Edit
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item dropdown-item-danger" onclick="deleteEnvironment({{ env.id }}, '{{ env.name }}')">
+                            <span class="dropdown-icon">🗑️</span> Delete
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
     
     {% if not environments %}
-    <div class="alert alert-info">
-        No environments configured. Click "Add Environment" to get started.
+    <div class="empty-state">
+        <div class="empty-state-icon">📦</div>
+        <h3 class="empty-state-title">No Environments Configured</h3>
+        <p class="empty-state-text">Get started by adding your first VCF environment.</p>
+        {% if current_user.role != 'readonly' %}
+        <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
+            <span class="btn-icon">+</span> Add Environment
+        </button>
+        {% endif %}
     </div>
     {% endif %}
 </div>
 
 <!-- Add/Edit Environment Modal -->
-<clr-modal id="environmentModal" [clrModalOpen]="false" [clrModalSize]="'lg'">
-    <div class="modal" id="env-modal" style="display: none;">
-        <div class="modal-dialog" role="dialog" aria-hidden="true">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title" id="modal-title">Add Environment</h3>
-                    <button aria-label="Close" class="close" type="button" onclick="closeEnvironmentModal()">
-                        ✕
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="environmentForm">
-                        <input type="hidden" id="env-id" name="id">
+<div class="modal" id="env-modal">
+    <div class="modal-backdrop" onclick="closeEnvironmentModal()"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Add Environment</h3>
+                <button class="close" onclick="closeEnvironmentModal()" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="environmentForm">
+                    <input type="hidden" id="env-id" name="id">
+                    
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h4 class="form-section-title">Basic Information</h4>
                         
-                        <section class="form-block">
-                            <label>Basic Information</label>
-                            
-                            <div class="form-group">
-                                <label for="env-name" class="required">Environment Name</label>
-                                <input type="text" id="env-name" name="name" placeholder="e.g., Production" required class="clr-input">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="env-description">Description</label>
-                                <textarea id="env-description" name="description" rows="2" class="clr-textarea"></textarea>
-                            </div>
-                        </section>
+                        <div class="form-group">
+                            <label for="env-name" class="clr-required-mark">Environment Name</label>
+                            <input type="text" id="env-name" name="name" placeholder="e.g., Production" required class="clr-input">
+                        </div>
                         
-                        <section class="form-block">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                                <label style="margin: 0;">VCF Installer Configuration</label>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="installer-toggle" onchange="toggleInstallerSection()">
-                                    <span class="toggle-slider"></span>
-                                </label>
+                        <div class="form-group">
+                            <label for="env-description">Description</label>
+                            <textarea id="env-description" name="description" rows="2" class="clr-textarea" placeholder="Optional description"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- VCF Installer -->
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <h4 class="form-section-title">VCF Installer Configuration</h4>
+                            <label class="clr-toggle-wrapper">
+                                <input type="checkbox" id="installer-toggle" class="clr-toggle" onchange="toggleInstallerSection()">
+                                <span class="clr-toggle-track"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="installer-section" class="form-section-content" style="display: none;">
+                            <div class="form-group">
+                                <label for="installer-host">Installer Host</label>
+                                <input type="text" id="installer-host" name="installer_host" placeholder="installer.example.com" class="clr-input">
                             </div>
                             
-                            <div id="installer-section" style="display: none;">
+                            <div class="form-row">
                                 <div class="form-group">
-                                    <label for="installer-host">Installer Host</label>
-                                    <input type="text" id="installer-host" name="installer_host" placeholder="installer.example.com" class="form-control">
+                                    <label for="installer-username">Username</label>
+                                    <input type="text" id="installer-username" name="installer_username" class="clr-input">
                                 </div>
-                                
-                                <div class="row">
-                                    <div class="col-6">
-                                        <div class="form-group">
-                                            <label for="installer-username">Username</label>
-                                            <input type="text" id="installer-username" name="installer_username" class="form-control">
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="form-group">
-                                            <label for="installer-password">Password</label>
-                                            <input type="password" id="installer-password" name="installer_password" class="form-control">
-                                        </div>
-                                    </div>
-                                </div>
-                                
                                 <div class="form-group">
-                                    <label style="display: flex; align-items: center;">
-                                        <input type="checkbox" id="installer-ssl-verify" name="installer_ssl_verify" checked style="margin-right: 0.5rem;">
-                                        Verify SSL certificates for Installer
-                                    </label>
-                                </div>
-                            </div>
-                        </section>
-                        
-                        <section class="form-block">
-                            <label>SDDC Manager Configuration</label>
-                            
-                            <div class="form-group">
-                                <label for="manager-host">Manager Host</label>
-                                <input type="text" id="manager-host" name="manager_host" placeholder="sddc-manager.example.com" class="form-control">
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-6">
-                                    <div class="form-group">
-                                        <label for="manager-username">Username</label>
-                                        <input type="text" id="manager-username" name="manager_username" class="form-control">
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="form-group">
-                                        <label for="manager-password">Password</label>
-                                        <input type="password" id="manager-password" name="manager_password" class="form-control">
-                                    </div>
+                                    <label for="installer-password">Password</label>
+                                    <input type="password" id="installer-password" name="installer_password" class="clr-input">
                                 </div>
                             </div>
                             
                             <div class="form-group">
-                                <label style="display: flex; align-items: center;">
-                                    <input type="checkbox" id="manager-ssl-verify" name="manager_ssl_verify" checked style="margin-right: 0.5rem;">
-                                    Verify SSL certificates for Manager
+                                <label class="clr-checkbox-wrapper">
+                                    <input type="checkbox" id="installer-ssl-verify" name="installer_ssl_verify" checked class="clr-checkbox">
+                                    <span class="clr-checkbox-label">Verify SSL certificates</span>
                                 </label>
                             </div>
-                        </section>
+                        </div>
+                    </div>
+                    
+                    <!-- SDDC Manager -->
+                    <div class="form-section">
+                        <h4 class="form-section-title">SDDC Manager Configuration</h4>
                         
-                        <section class="form-block">
-                            <label>Installer Sync Configuration</label>
-                            
-                            <div class="form-group">
-                                <label style="display: flex; align-items: center;">
-                                    <input type="checkbox" id="installer-sync-enabled" name="installer_sync_enabled" style="margin-right: 0.5rem;">
-                                    Enable automatic installer sync
-                                </label>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="installer-sync-interval">Installer Sync Interval (minutes)</label>
-                                <input type="number" id="installer-sync-interval" name="installer_sync_interval_minutes" value="0" min="0" class="form-control">
-                                <small class="form-text text-muted">Set to 0 to disable. Default: disabled (installer credentials rarely change)</small>
-                            </div>
-                        </section>
+                        <div class="form-group">
+                            <label for="manager-host">Manager Host</label>
+                            <input type="text" id="manager-host" name="manager_host" placeholder="sddc-manager.example.com" class="clr-input">
+                        </div>
                         
-                        <section class="form-block">
-                            <label>Manager Sync Configuration</label>
-                            
+                        <div class="form-row">
                             <div class="form-group">
-                                <label style="display: flex; align-items: center;">
-                                    <input type="checkbox" id="manager-sync-enabled" name="manager_sync_enabled" checked style="margin-right: 0.5rem;">
-                                    Enable automatic manager sync
+                                <label for="manager-username">Username</label>
+                                <input type="text" id="manager-username" name="manager_username" class="clr-input">
+                            </div>
+                            <div class="form-group">
+                                <label for="manager-password">Password</label>
+                                <input type="password" id="manager-password" name="manager_password" class="clr-input">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="clr-checkbox-wrapper">
+                                <input type="checkbox" id="manager-ssl-verify" name="manager_ssl_verify" checked class="clr-checkbox">
+                                <span class="clr-checkbox-label">Verify SSL certificates</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Sync Configuration -->
+                    <div class="form-section">
+                        <h4 class="form-section-title">Automatic Sync Configuration</h4>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="clr-checkbox-wrapper">
+                                    <input type="checkbox" id="installer-sync-enabled" name="installer_sync_enabled" class="clr-checkbox">
+                                    <span class="clr-checkbox-label">Enable Installer Sync</span>
                                 </label>
+                                <input type="number" id="installer-sync-interval" name="installer_sync_interval_minutes" value="0" min="0" class="clr-input clr-input-sm" placeholder="Minutes">
+                                <span class="form-hint">Default: disabled (installer credentials rarely change)</span>
                             </div>
-                            
                             <div class="form-group">
-                                <label for="manager-sync-interval">Manager Sync Interval (minutes)</label>
-                                <input type="number" id="manager-sync-interval" name="manager_sync_interval_minutes" value="60" min="0" class="form-control">
-                                <small class="form-text text-muted">Set to 0 to disable. Default: 60 minutes</small>
+                                <label class="clr-checkbox-wrapper">
+                                    <input type="checkbox" id="manager-sync-enabled" name="manager_sync_enabled" checked class="clr-checkbox">
+                                    <span class="clr-checkbox-label">Enable Manager Sync</span>
+                                </label>
+                                <input type="number" id="manager-sync-interval" name="manager_sync_interval_minutes" value="60" min="0" class="clr-input clr-input-sm" placeholder="Minutes">
+                                <span class="form-hint">Default: 60 minutes</span>
                             </div>
-                        </section>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-outline" type="button" onclick="testCredentials()" id="test-btn" style="margin-right: auto;">
-                        🧪 Test Connection
-                    </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" type="button" onclick="testCredentials()" id="test-btn">
+                    Test Connection
+                </button>
+                <div class="modal-footer-right">
                     <button class="btn btn-outline" type="button" onclick="closeEnvironmentModal()">Cancel</button>
                     <button class="btn btn-primary" type="button" onclick="saveEnvironment()">Save</button>
                 </div>
             </div>
         </div>
     </div>
-</clr-modal>
+</div>
 
 <!-- Import Environment Modal -->
-<div class="modal" id="import-modal" style="display: none;">
-    <div class="modal-dialog" role="dialog" aria-hidden="true">
+<div class="modal" id="import-modal">
+    <div class="modal-backdrop" onclick="closeImportModal()"></div>
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Import Environment from File</h3>
-                <button aria-label="Close" class="close" type="button" onclick="closeImportModal()">
-                    ✕
+                <button class="close" onclick="closeImportModal()" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <p>Upload a JSON or YAML file containing environment configuration. The file will be validated and connections will be tested before creating the environment.</p>
+                <p class="modal-description">Upload a JSON or YAML file containing environment configuration. The file will be validated and connections will be tested before creating the environment.</p>
                 
-                <section class="form-block">
-                    <label>Select File</label>
-                    <div class="form-group">
-                        <input type="file" id="import-file" accept=".json,.yaml,.yml" class="form-control" onchange="previewImportFile()">
-                        <small class="form-text text-muted">Supported formats: JSON (.json), YAML (.yaml, .yml)</small>
+                <div class="form-group">
+                    <label for="import-file">Select File</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="import-file" accept=".json,.yaml,.yml" class="clr-file" onchange="previewImportFile()">
                     </div>
-                </section>
+                    <span class="form-hint">Supported formats: JSON (.json), YAML (.yaml, .yml)</span>
+                </div>
                 
-                <section class="form-block" id="import-preview-section" style="display: none;">
+                <div id="import-preview-section" style="display: none;">
                     <label>File Preview</label>
-                    <pre id="import-preview" style="background: #f5f5f5; padding: 1rem; border-radius: 4px; max-height: 300px; overflow: auto; font-size: 0.85rem;"></pre>
-                </section>
+                    <pre id="import-preview" class="code-preview"></pre>
+                </div>
                 
-                <section class="form-block" id="import-validation-section" style="display: none;">
+                <div id="import-validation-section" style="display: none;">
                     <label>Validation Results</label>
                     <div id="import-validation-results"></div>
-                </section>
+                </div>
                 
-                <details style="margin-top: 1rem;">
-                    <summary style="cursor: pointer; color: #0072a3;">View file format examples</summary>
-                    <div style="margin-top: 1rem;">
+                <details class="file-format-help">
+                    <summary>View file format examples</summary>
+                    <div class="format-examples">
                         <h5>JSON Format:</h5>
-                        <pre style="background: #f5f5f5; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem;">{
+                        <pre class="code-preview code-preview-sm">{
   "name": "Production VCF",
   "description": "Production environment",
   "installer_host": "vcf-installer.example.com",
   "installer_username": "admin",
   "installer_password": "password123",
-  "installer_ssl_verify": false,
   "manager_host": "sddc-manager.example.com",
   "manager_username": "administrator@vsphere.local",
-  "manager_password": "password123",
-  "manager_ssl_verify": false,
-  "sync_enabled": true,
-  "sync_interval_minutes": 60
+  "manager_password": "password123"
 }</pre>
-                        <h5 style="margin-top: 1rem;">YAML Format:</h5>
-                        <pre style="background: #f5f5f5; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem;">name: Production VCF
+                        <h5>YAML Format:</h5>
+                        <pre class="code-preview code-preview-sm">name: Production VCF
 description: Production environment
 installer_host: vcf-installer.example.com
 installer_username: admin
 installer_password: password123
-installer_ssl_verify: false
 manager_host: sddc-manager.example.com
 manager_username: administrator@vsphere.local
-manager_password: password123
-manager_ssl_verify: false
-sync_enabled: true
-sync_interval_minutes: 60</pre>
+manager_password: password123</pre>
                     </div>
                 </details>
             </div>
@@ -335,68 +348,454 @@ sync_interval_minutes: 60</pre>
 
 {% block extra_css %}
 <style>
+    /* Container */
     .dashboard-container {
-        padding: 2rem;
+        padding: 1.5rem 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
     }
     
-    .environment-card {
-        margin-bottom: 1.5rem;
-        height: 100%;
-    }
-    
-    .environment-card .card-header h3 {
-        margin: 0;
-        font-size: 1.2rem;
-    }
-    
-    .env-info {
-        margin-top: 1rem;
-    }
-    
-    .info-item {
+    /* Page Header - Clarity Style */
+    .page-header {
         display: flex;
-        align-items: center;
-        margin: 0.5rem 0;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .header-content h1 {
+        margin: 0 0 0.25rem 0;
+        font-size: 1.5rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .header-description {
+        color: #666;
+        margin: 0;
         font-size: 0.9rem;
     }
     
-    .card-footer {
+    .header-actions {
         display: flex;
-        flex-wrap: wrap;
         gap: 0.5rem;
     }
     
-    .card-footer .btn-link {
-        padding: 0.25rem 0.5rem;
-    }
-    
-    .btn-danger {
-        color: #c92100 !important;
-    }
-    
-    /* Error and sync status styles */
-    .error-badge {
-        display: block;
-        color: #c92100;
-        font-size: 0.8rem;
-        margin-top: 0.25rem;
-        padding: 0.2rem 0.4rem;
-        background-color: #fff0f0;
+    /* Button Styles - Clarity Guidelines */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        padding: 0 0.75rem;
+        height: 36px;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
         border-radius: 3px;
-        border-left: 3px solid #c92100;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
     }
     
-    .sync-failed {
+    .btn-sm {
+        height: 30px;
+        padding: 0 0.6rem;
+        font-size: 0.6rem;
+    }
+    
+    .btn-icon {
+        font-size: 1.1em;
+    }
+    
+    .btn-primary {
+        background-color: #0072a3;
+        border-color: #0072a3;
+        color: #fff;
+    }
+    
+    .btn-primary:hover {
+        background-color: #005a82;
+        border-color: #005a82;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border-color: #0072a3;
+        color: #0072a3;
+    }
+    
+    .btn-outline:hover {
+        background-color: #e8f4f8;
+    }
+    
+    .btn-link {
+        background: transparent;
+        border-color: transparent;
+        color: #0072a3;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+        padding: 0 0.5rem;
+    }
+    
+    .btn-link:hover {
+        text-decoration: underline;
+    }
+    
+    .btn-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .btn-group-overflow {
+        position: relative;
+    }
+    
+    .caret {
+        font-size: 0.7em;
+        margin-left: 0.25rem;
+    }
+    
+    /* Alert - Clarity Style */
+    .alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 3px;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .alert-icon {
+        flex-shrink: 0;
+    }
+    
+    .alert::before {
+        flex-shrink: 0;
+        font-size: 1rem;
+        line-height: 1.4;
+    }
+    
+    .alert-info {
+        background-color: #e1f5fe;
+        border: 1px solid #b3e5fc;
+        color: #01579b;
+    }
+    
+    .alert-info::before {
+        content: "ℹ";
+    }
+    
+    .alert-success {
+        background-color: #e6f4ea;
+        border: 1px solid #b7e1cd;
+        color: #1e7e34;
+    }
+    
+    .alert-success::before {
+        content: "✓";
+    }
+    
+    .alert-danger {
+        background-color: #fce8e6;
+        border: 1px solid #f5c6cb;
         color: #c92100;
-        font-weight: 500;
     }
     
-    .sync-partial {
-        color: #e67300;
-        font-weight: 500;
+    .alert-danger::before {
+        content: "✕";
     }
     
-    /* Modal centered on page */
+    /* Environment Grid */
+    .env-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.25rem;
+    }
+    
+    /* Environment Card - Clarity Style */
+    .env-card {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow 0.15s ease;
+    }
+    
+    .env-card:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+    
+    .env-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 1rem;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .env-card-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .env-card-description {
+        padding: 0.75rem 1rem 0;
+        margin: 0;
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 0.125rem 0.5rem;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-radius: 0.5rem;
+    }
+    
+    .status-success {
+        background-color: #60b515;
+        color: #fff;
+    }
+    
+    .status-warning {
+        background-color: #ffc107;
+        color: #313131;
+    }
+    
+    .status-danger {
+        background-color: #c92100;
+        color: #fff;
+    }
+    
+    /* Environment Info Grid */
+    .env-info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        padding: 1rem;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .env-info-item {
+        min-width: 0;
+    }
+    
+    .env-info-label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+    
+    .env-info-value {
+        font-size: 0.85rem;
+        color: #313131;
+        word-break: break-all;
+    }
+    
+    .env-info-error {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.25rem;
+        margin-top: 0.375rem;
+        padding: 0.375rem 0.5rem;
+        background-color: #fce8e6;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        color: #c92100;
+    }
+    
+    .error-icon {
+        flex-shrink: 0;
+    }
+    
+    /* Environment Stats */
+    .env-stats {
+        display: flex;
+        justify-content: space-around;
+        padding: 0.875rem 1rem;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .env-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .env-stat-icon {
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .env-stat-value {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .env-stat-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #666;
+    }
+    
+    .text-danger { color: #c92100; }
+    .text-warning { color: #856404; }
+    
+    /* Sync Progress Inline */
+    .sync-progress-inline {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        background: #e8f4f8;
+        border-bottom: 1px solid #b3e5fc;
+    }
+    
+    .sync-progress-bar {
+        flex: 1;
+        height: 6px;
+        background-color: #cce5f0;
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .sync-progress-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 30%;
+        background: linear-gradient(90deg, transparent 0%, #0072a3 50%, transparent 100%);
+        border-radius: 3px;
+        animation: sync-progress-slide 1.2s ease-in-out infinite;
+    }
+    
+    @keyframes sync-progress-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(400%); }
+    }
+    
+    .sync-progress-text {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #0072a3;
+        white-space: nowrap;
+    }
+    
+    /* Card Actions */
+    .env-card-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin-top: auto;
+    }
+    
+    /* Dropdown Menu */
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 0.25rem;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        min-width: 140px;
+        z-index: 1000;
+    }
+    
+    .dropdown-menu.show {
+        display: block;
+    }
+    
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: transparent;
+        border: none;
+        text-align: left;
+        font-size: 0.8rem;
+        color: #313131;
+        cursor: pointer;
+    }
+    
+    .dropdown-item:hover {
+        background-color: #f0f0f0;
+    }
+    
+    .dropdown-item-danger {
+        color: #c92100;
+    }
+    
+    .dropdown-item-danger:hover {
+        background-color: #fce8e6;
+    }
+    
+    .dropdown-divider {
+        height: 1px;
+        background-color: #e8e8e8;
+        margin: 0.25rem 0;
+    }
+    
+    .dropdown-icon {
+        font-size: 0.9rem;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state-title {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .empty-state-text {
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Modal - Clarity Style */
     .modal {
         display: none;
         position: fixed;
@@ -404,59 +803,225 @@ sync_interval_minutes: 60</pre>
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        overflow-y: auto;
+        z-index: 1050;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
     }
     
     .modal.show {
-        display: flex !important;
+        display: flex;
+    }
+    
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.65);
+        z-index: 1040;
     }
     
     .modal-dialog {
-        background: white;
-        border-radius: 4px;
-        max-width: 800px;
-        width: 100%;
+        position: relative;
+        z-index: 1060;
+        width: 90%;
+        max-width: 600px;
         max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        margin: auto;
+        display: flex;
+        flex-direction: column;
     }
     
-    .form-block {
+    .modal-dialog.modal-lg {
+        max-width: 800px;
+    }
+    
+    .modal-content {
+        background: #fff;
+        border-radius: 3px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+    }
+    
+    .modal-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e8e8e8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    
+    .modal-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    
+    .close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+        color: #666;
+        padding: 0;
+    }
+    
+    .close:hover {
+        color: #313131;
+    }
+    
+    .modal-body {
+        padding: 1.25rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    
+    .modal-description {
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+    
+    .modal-footer {
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid #e8e8e8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    
+    .modal-footer-right {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    /* Form Styles - Clarity */
+    .form-section {
         margin-bottom: 1.5rem;
         padding: 1rem;
         background: #fafafa;
-        border-radius: 4px;
+        border-radius: 3px;
+        border: 1px solid #e8e8e8;
     }
     
-    .form-block > label {
-        font-weight: 600;
-        font-size: 1rem;
-        display: block;
+    .form-section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 1rem;
+    }
+    
+    .form-section-title {
+        margin: 0 0 1rem 0;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
         color: #0072a3;
     }
     
-    /* Toggle Switch */
-    .toggle-switch {
+    .form-section-header .form-section-title {
+        margin-bottom: 0;
+    }
+    
+    .form-section-content {
+        padding-top: 0.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-bottom: 0.375rem;
+        color: #313131;
+    }
+    
+    .clr-required-mark::after {
+        content: '*';
+        color: #c92100;
+        margin-left: 0.25rem;
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    .clr-input,
+    .clr-textarea,
+    .clr-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        background: #fff;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .clr-input:focus,
+    .clr-textarea:focus,
+    .clr-select:focus {
+        outline: none;
+        border-color: #0072a3;
+        box-shadow: 0 0 0 2px rgba(0, 114, 163, 0.2);
+    }
+    
+    .clr-input-sm {
+        margin-top: 0.5rem;
+        max-width: 120px;
+    }
+    
+    .form-hint {
+        display: block;
+        font-size: 0.75rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    /* Checkbox - Clarity Style */
+    .clr-checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+    
+    .clr-checkbox {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #0072a3;
+    }
+    
+    .clr-checkbox-label {
+        font-size: 0.875rem;
+        font-weight: normal;
+    }
+    
+    /* Toggle Switch - Clarity Style */
+    .clr-toggle-wrapper {
         position: relative;
         display: inline-block;
-        width: 50px;
+        width: 48px;
         height: 24px;
     }
     
-    .toggle-switch input {
+    .clr-toggle {
         opacity: 0;
         width: 0;
         height: 0;
     }
     
-    .toggle-slider {
+    .clr-toggle-track {
         position: absolute;
         cursor: pointer;
         top: 0;
@@ -464,11 +1029,11 @@ sync_interval_minutes: 60</pre>
         right: 0;
         bottom: 0;
         background-color: #ccc;
-        transition: .4s;
+        transition: 0.3s;
         border-radius: 24px;
     }
     
-    .toggle-slider:before {
+    .clr-toggle-track::before {
         position: absolute;
         content: "";
         height: 18px;
@@ -476,53 +1041,92 @@ sync_interval_minutes: 60</pre>
         left: 3px;
         bottom: 3px;
         background-color: white;
-        transition: .4s;
+        transition: 0.3s;
         border-radius: 50%;
     }
     
-    input:checked + .toggle-slider {
+    .clr-toggle:checked + .clr-toggle-track {
         background-color: #0072a3;
     }
     
-    input:checked + .toggle-slider:before {
-        transform: translateX(26px);
+    .clr-toggle:checked + .clr-toggle-track::before {
+        transform: translateX(24px);
     }
     
-    .toggle-slider:hover {
-        background-color: #999;
+    /* File Input */
+    .file-input-wrapper {
+        margin-top: 0.5rem;
     }
     
-    input:checked + .toggle-slider:hover {
-        background-color: #005a82;
+    .clr-file {
+        font-size: 0.875rem;
     }
     
-    /* Alert styles for import modal */
-    .alert {
+    /* Code Preview */
+    .code-preview {
+        background: #f5f5f5;
         padding: 1rem;
-        border-radius: 4px;
-        margin-bottom: 1rem;
+        border-radius: 3px;
+        border: 1px solid #e0e0e0;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.8rem;
+        overflow-x: auto;
+        max-height: 250px;
+        margin-top: 0.5rem;
     }
     
-    .alert-success {
-        background-color: #dff0d8;
-        border: 1px solid #3e8635;
-        color: #2d6a28;
+    .code-preview-sm {
+        max-height: 150px;
+        padding: 0.75rem;
     }
     
-    .alert-danger {
-        background-color: #f2dede;
-        border: 1px solid #c92100;
-        color: #a94442;
+    /* File Format Help */
+    .file-format-help {
+        margin-top: 1.5rem;
+        font-size: 0.875rem;
     }
     
-    .alert ul {
-        margin: 0.5rem 0 0 1.5rem;
-        padding: 0;
+    .file-format-help summary {
+        cursor: pointer;
+        color: #0072a3;
+        font-weight: 500;
+    }
+    
+    .format-examples {
+        margin-top: 1rem;
+    }
+    
+    .format-examples h5 {
+        margin: 1rem 0 0.5rem 0;
+        font-size: 0.85rem;
+        color: #313131;
     }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+    // Toggle environment action dropdown
+    function toggleEnvActions(envId) {
+        // Close all other dropdowns
+        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+            if (menu.id !== `env-actions-${envId}`) {
+                menu.classList.remove('show');
+            }
+        });
+        
+        const dropdown = document.getElementById(`env-actions-${envId}`);
+        dropdown.classList.toggle('show');
+    }
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.btn-group-overflow')) {
+            document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                menu.classList.remove('show');
+            });
+        }
+    });
+</script>
 {% endblock %}
-

@@ -4,53 +4,63 @@
 
 {% block content %}
 <div class="settings-container">
+    <!-- Page Header -->
     <div class="page-header">
         <div class="header-content">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
-                ← Back to Dashboard
+            <a href="{{ url_for('dashboard') }}" class="btn btn-link">
+                <span class="btn-icon">←</span> Back to Dashboard
             </a>
             <h1>Settings</h1>
-            <p class="p6">Manage system settings, users, and SSL certificates</p>
+            <p class="header-description">Manage system settings, users, and SSL certificates</p>
         </div>
     </div>
     
+    <!-- Settings Navigation Grid -->
     <div class="settings-grid">
         <!-- User Management -->
         <a href="{{ url_for('settings_users') }}" class="settings-card">
-            <div class="settings-card-icon">👥</div>
+            <div class="settings-card-icon-wrapper">
+                <span class="settings-card-icon">👥</span>
+            </div>
             <div class="settings-card-content">
-                <h3>User Management</h3>
-                <p>Manage user accounts, roles, and permissions</p>
+                <h3 class="settings-card-title">User Management</h3>
+                <p class="settings-card-description">Manage user accounts, roles, and permissions</p>
             </div>
             <div class="settings-card-arrow">→</div>
         </a>
         
         <!-- SSL Certificates -->
         <a href="{{ url_for('settings_ssl') }}" class="settings-card">
-            <div class="settings-card-icon">🔒</div>
+            <div class="settings-card-icon-wrapper">
+                <span class="settings-card-icon">🔒</span>
+            </div>
             <div class="settings-card-content">
-                <h3>SSL Certificates</h3>
-                <p>Upload and manage SSL certificates for HTTPS</p>
+                <h3 class="settings-card-title">SSL Certificates</h3>
+                <p class="settings-card-description">Upload and manage SSL certificates for HTTPS</p>
             </div>
             <div class="settings-card-arrow">→</div>
         </a>
         
         <!-- System Logs -->
         <a href="{{ url_for('logs_view') }}" class="settings-card">
-            <div class="settings-card-icon">📋</div>
+            <div class="settings-card-icon-wrapper">
+                <span class="settings-card-icon">📋</span>
+            </div>
             <div class="settings-card-content">
-                <h3>System Logs</h3>
-                <p>View application logs and user access history</p>
+                <h3 class="settings-card-title">System Logs</h3>
+                <p class="settings-card-description">View application logs and user access history</p>
             </div>
             <div class="settings-card-arrow">→</div>
         </a>
         
         <!-- Server Management -->
         <a href="{{ url_for('settings_server') }}" class="settings-card">
-            <div class="settings-card-icon">🖥️</div>
+            <div class="settings-card-icon-wrapper">
+                <span class="settings-card-icon">🖥️</span>
+            </div>
             <div class="settings-card-content">
-                <h3>Server Management</h3>
-                <p>Restart server and view system status</p>
+                <h3 class="settings-card-title">Server Management</h3>
+                <p class="settings-card-description">Restart server and view system status</p>
             </div>
             <div class="settings-card-arrow">→</div>
         </a>
@@ -60,82 +70,141 @@
 
 {% block extra_css %}
 <style>
+    /* Container */
     .settings-container {
-        padding: 2rem;
+        padding: 1.5rem 2rem;
         max-width: 1000px;
         margin: 0 auto;
     }
     
+    /* Page Header */
     .page-header {
         margin-bottom: 2rem;
     }
     
-    .page-header h1 {
-        margin: 0.5rem 0;
+    .header-content h1 {
+        margin: 0.5rem 0 0.25rem 0;
+        font-size: 1.5rem;
+        font-weight: 500;
+        color: #313131;
     }
     
-    .page-header .p6 {
+    .header-description {
         color: #666;
         margin: 0;
+        font-size: 0.9rem;
     }
     
+    /* Button - Clarity Style */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        padding: 0 0.75rem;
+        height: 36px;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 3px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+        text-decoration: none;
+    }
+    
+    .btn-link {
+        background: transparent;
+        border-color: transparent;
+        color: #0072a3;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+        padding: 0;
+        height: auto;
+    }
+    
+    .btn-link:hover {
+        text-decoration: underline;
+    }
+    
+    .btn-icon {
+        font-size: 1em;
+    }
+    
+    /* Settings Grid */
     .settings-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
+        gap: 1rem;
     }
     
+    /* Settings Card - Clarity Style */
     .settings-card {
         display: flex;
         align-items: center;
-        background: white;
-        padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        background: #fff;
+        padding: 1.25rem;
+        border: 1px solid #ccc;
+        border-radius: 3px;
         text-decoration: none;
         color: inherit;
-        transition: all 0.2s ease;
-        border: 2px solid transparent;
+        transition: all 0.15s ease;
     }
     
     .settings-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         border-color: #0072a3;
-        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
     
-    .settings-card-icon {
-        font-size: 2.5rem;
+    .settings-card-icon-wrapper {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f0f6f8;
+        border-radius: 3px;
         margin-right: 1rem;
         flex-shrink: 0;
     }
     
+    .settings-card-icon {
+        font-size: 1.5rem;
+    }
+    
     .settings-card-content {
         flex: 1;
+        min-width: 0;
     }
     
-    .settings-card-content h3 {
+    .settings-card-title {
         margin: 0 0 0.25rem 0;
-        color: #333;
-        font-size: 1.1rem;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #313131;
     }
     
-    .settings-card-content p {
+    .settings-card-description {
         margin: 0;
+        font-size: 0.8rem;
         color: #666;
-        font-size: 0.9rem;
+        line-height: 1.4;
     }
     
     .settings-card-arrow {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
         color: #0072a3;
         margin-left: 1rem;
         opacity: 0;
-        transition: opacity 0.2s ease;
+        transition: opacity 0.15s ease, transform 0.15s ease;
     }
     
     .settings-card:hover .settings-card-arrow {
         opacity: 1;
+        transform: translateX(4px);
     }
 </style>
 {% endblock %}

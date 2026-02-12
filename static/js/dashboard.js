@@ -8,19 +8,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function loadCredentialCounts() {
-    const cards = document.querySelectorAll('.environment-card');
+    // Support both old class (.environment-card) and new class (.env-card)
+    const cards = document.querySelectorAll('.env-card, .environment-card');
     
     for (const card of cards) {
         const envId = card.dataset.envId;
         const countElement = document.getElementById(`cred-count-${envId}`);
         
+        if (!countElement) continue;
+        
         try {
             const response = await fetch(`/api/environments/${envId}/credentials`);
             const credentials = await response.json();
-            countElement.textContent = `${credentials.length} credential${credentials.length !== 1 ? 's' : ''}`;
+            countElement.textContent = credentials.length;
         } catch (error) {
             console.error(`Error loading credentials for environment ${envId}:`, error);
-            countElement.textContent = 'Error loading';
+            countElement.textContent = 'Error';
         }
     }
 }
@@ -279,7 +282,15 @@ async function syncEnvironment(envId) {
     
     const card = document.querySelector(`[data-env-id="${envId}"]`);
     const countElement = document.getElementById(`cred-count-${envId}`);
-    countElement.textContent = 'Syncing...';
+    const statsRow = card ? card.querySelector('.env-stats') : null;
+    
+    // Show progress indicator
+    if (statsRow) {
+        showSyncProgress(card, statsRow);
+    }
+    if (countElement) {
+        countElement.textContent = '...';
+    }
     
     try {
         const response = await fetch(`/api/environments/${envId}/sync`, {
@@ -288,18 +299,31 @@ async function syncEnvironment(envId) {
         
         const result = await response.json();
         
-        if (response.ok) {
-            // Reload to get updated status including any errors
-            location.reload();
-        } else {
-            // Still reload to show any partial results and error status
-            location.reload();
-        }
+        // Short delay to show completion state
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reload to get updated status including any errors
+        location.reload();
     } catch (error) {
         console.error('Error syncing environment:', error);
         // Reload to show current state
         location.reload();
     }
+}
+
+function showSyncProgress(card, statsRow) {
+    // Create progress bar element
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'sync-progress-inline';
+    progressContainer.innerHTML = `
+        <div class="sync-progress-bar">
+            <div class="sync-progress-fill"></div>
+        </div>
+        <span class="sync-progress-text">Syncing...</span>
+    `;
+    
+    // Insert before stats row
+    statsRow.parentNode.insertBefore(progressContainer, statsRow);
 }
 
 function viewEnvironment(envId) {

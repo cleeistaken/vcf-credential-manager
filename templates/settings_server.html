@@ -4,260 +4,598 @@
 
 {% block content %}
 <div class="settings-container">
+    <!-- Page Header -->
     <div class="page-header">
         <div class="header-content">
-            <a href="{{ url_for('settings') }}" class="btn btn-outline">
-                ← Back to Settings
+            <a href="{{ url_for('settings') }}" class="btn btn-link">
+                <span class="btn-icon">←</span> Back to Settings
             </a>
-            <h1>🖥️ Server Management</h1>
-            <p class="p6">Restart server and view system status</p>
+            <h1>Server Management</h1>
+            <p class="header-description">Monitor system status and manage server operations</p>
         </div>
     </div>
     
+    <!-- Storage Information Card -->
     <div class="card">
-        <h3>Scheduler Status</h3>
-        <div id="scheduler-status">
-            <p class="text-muted">Loading scheduler status...</p>
+        <div class="card-header">
+            <h3 class="card-title">Storage Information</h3>
+            <button class="btn btn-outline btn-sm" onclick="loadStorageInfo()">
+                Refresh
+            </button>
+        </div>
+        <div class="card-block">
+            <div id="storage-info" class="storage-grid">
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading storage information...</span>
+                </div>
+            </div>
         </div>
     </div>
     
+    <!-- Scheduler Status Card -->
     <div class="card">
-        <h3>Restart Server</h3>
-        <p>Restart the Gunicorn server to apply new SSL certificates or configuration changes.</p>
-        
-        <div class="alert alert-warning">
-            <strong>⚠ Warning:</strong> Restarting the server will:
-            <ul>
-                <li>Disconnect all active users (they will need to log in again)</li>
-                <li>Reload SSL certificates</li>
-                <li>Apply any configuration changes</li>
-                <li>Take approximately 5-10 seconds</li>
-            </ul>
+        <div class="card-header">
+            <h3 class="card-title">Scheduler Status</h3>
+            <button class="btn btn-outline btn-sm" onclick="loadSchedulerStatus()">
+                Refresh
+            </button>
         </div>
-        
-        <button class="btn btn-danger" onclick="restartServer()">
-            🔄 Restart Server
-        </button>
-        
-        <div id="restart-status" style="display: none; margin-top: 1rem;"></div>
+        <div class="card-block">
+            <div id="scheduler-status">
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading scheduler status...</span>
+                </div>
+            </div>
+        </div>
     </div>
     
-    <div class="card">
-        <h3>System Information</h3>
-        <table class="info-table">
-            <tr>
-                <th>Application:</th>
-                <td>VCF Credentials Manager</td>
-            </tr>
-            <tr>
-                <th>Python Version:</th>
-                <td id="python-version">Loading...</td>
-            </tr>
-            <tr>
-                <th>Database:</th>
-                <td>SQLite</td>
-            </tr>
-            <tr>
-                <th>Log Directory:</th>
-                <td><code>logs/</code></td>
-            </tr>
-            <tr>
-                <th>SSL Directory:</th>
-                <td><code>ssl/</code></td>
-            </tr>
-        </table>
+    <!-- Restart Server Card -->
+    <div class="card card-danger">
+        <div class="card-header">
+            <h3 class="card-title">Restart Server</h3>
+        </div>
+        <div class="card-block">
+            <p class="card-description">Restart the Gunicorn server to apply new SSL certificates or configuration changes.</p>
+            
+            <div class="alert alert-warning">
+                <div class="alert-content">
+                    <strong>Warning:</strong> Restarting the server will:
+                    <ul class="alert-list">
+                        <li>Disconnect all active users (they will need to log in again)</li>
+                        <li>Reload SSL certificates</li>
+                        <li>Apply any configuration changes</li>
+                        <li>Take approximately 5-10 seconds</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <button class="btn btn-danger" onclick="restartServer()" id="restart-btn">
+                Restart Server
+            </button>
+            
+            <div id="restart-status" class="status-message" style="display: none;"></div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
+    /* Container */
     .settings-container {
-        padding: 2rem;
+        padding: 1.5rem 2rem;
         max-width: 900px;
         margin: 0 auto;
     }
     
+    /* Page Header */
     .page-header {
-        margin-bottom: 2rem;
-    }
-    
-    .page-header h1 {
-        margin: 0.5rem 0;
-    }
-    
-    .page-header .p6 {
-        color: #666;
-        margin: 0;
-    }
-    
-    .card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         margin-bottom: 1.5rem;
     }
     
-    .card h3 {
-        margin-top: 0;
-        margin-bottom: 1rem;
-        color: #333;
+    .header-content h1 {
+        margin: 0.5rem 0 0.25rem 0;
+        font-size: 1.5rem;
+        font-weight: 500;
+        color: #313131;
     }
     
-    .alert {
-        padding: 1rem;
-        border-radius: 4px;
-        margin-bottom: 1rem;
-    }
-    
-    .alert-info {
-        background-color: #e1f5fe;
-        border-left: 4px solid #0072a3;
-        color: #01579b;
-    }
-    
-    .alert-warning {
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
-        color: #856404;
-    }
-    
-    .alert-success {
-        background-color: #d4edda;
-        border-left: 4px solid #28a745;
-        color: #155724;
-    }
-    
-    .alert-danger {
-        background-color: #f8d7da;
-        border-left: 4px solid #dc3545;
-        color: #721c24;
-    }
-    
-    .alert ul {
-        margin: 0.5rem 0 0 1.5rem;
-    }
-    
-    .text-muted {
+    .header-description {
         color: #666;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    /* Button Styles - Clarity */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        padding: 0 0.75rem;
+        height: 36px;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 3px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+        text-decoration: none;
+    }
+    
+    .btn-sm {
+        height: 28px;
+        padding: 0 0.5rem;
+        font-size: 0.6rem;
+    }
+    
+    .btn-icon {
+        font-size: 1.1em;
+    }
+    
+    .btn-link {
+        background: transparent;
+        border-color: transparent;
+        color: #0072a3;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+        padding: 0;
+        height: auto;
+    }
+    
+    .btn-link:hover {
+        text-decoration: underline;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border-color: #0072a3;
+        color: #0072a3;
+    }
+    
+    .btn-outline:hover {
+        background-color: #e8f4f8;
     }
     
     .btn-danger {
-        background-color: #c92100 !important;
-        color: white !important;
-        border: 1px solid #c92100 !important;
-        font-weight: bold !important;
+        background-color: #c92100;
+        border-color: #c92100;
+        color: #fff;
     }
     
     .btn-danger:hover {
-        background-color: #a01a00 !important;
-        border-color: #a01a00 !important;
+        background-color: #a01a00;
+        border-color: #a01a00;
     }
     
-    .info-table {
-        width: 100%;
+    .btn-danger:disabled {
+        background-color: #9a9a9a;
+        border-color: #9a9a9a;
+        cursor: not-allowed;
     }
     
-    .info-table th {
-        text-align: left;
-        padding: 0.5rem;
-        width: 150px;
-        color: #555;
-        vertical-align: top;
-    }
-    
-    .info-table td {
-        padding: 0.5rem;
-    }
-    
-    .info-table code {
-        background: #f5f5f5;
-        padding: 0.2rem 0.4rem;
+    /* Card - Clarity Style */
+    .card {
+        background: #fff;
+        border: 1px solid #ccc;
         border-radius: 3px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-danger {
+        border-color: #e0e0e0;
+    }
+    
+    .card-danger .card-header {
+        background: #fafafa;
+        border-bottom-color: #e8e8e8;
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 1.25rem;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .card-title {
+        margin: 0;
         font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #313131;
+    }
+    
+    .card-block {
+        padding: 1.25rem;
+    }
+    
+    .card-description {
+        color: #666;
+        margin: 0 0 1rem 0;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    /* Loading State */
+    .loading-state {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #e0e0e0;
+        border-top-color: #0072a3;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Storage Grid */
+    .storage-grid {
+        display: grid;
+        gap: 1rem;
+    }
+    
+    .storage-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        align-items: center;
+        padding: 1rem;
+        background: #f5f5f5;
+        border-radius: 3px;
+        border-left: 3px solid #0072a3;
+    }
+    
+    .storage-item-info {
+        min-width: 0;
+    }
+    
+    .storage-item-label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #313131;
+        margin-bottom: 0.25rem;
+    }
+    
+    .storage-item-path {
+        font-size: 0.75rem;
+        color: #666;
+        font-family: 'Consolas', 'Monaco', monospace;
+    }
+    
+    .storage-item-size {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #313131;
+        text-align: right;
+        white-space: nowrap;
+    }
+    
+    .storage-item-detail {
+        font-size: 0.75rem;
+        color: #666;
+        text-align: right;
+    }
+    
+    /* Disk Space */
+    .disk-space-section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e8e8e8;
+    }
+    
+    .disk-space-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.75rem;
+    }
+    
+    .disk-space-label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .disk-space-value {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background-color: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+    
+    .progress-bar-fill.low {
+        background-color: #60b515;
+    }
+    
+    .progress-bar-fill.medium {
+        background-color: #ffc107;
+    }
+    
+    .progress-bar-fill.high {
+        background-color: #c92100;
+    }
+    
+    /* Scheduler Status */
+    .scheduler-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .scheduler-status-label {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-radius: 0.5rem;
+    }
+    
+    .status-badge-success {
+        background-color: #60b515;
+        color: #fff;
+    }
+    
+    .status-badge-danger {
+        background-color: #c92100;
+        color: #fff;
     }
     
     .scheduler-jobs {
         margin-top: 1rem;
     }
     
+    .scheduler-jobs-title {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 0.75rem;
+    }
+    
     .scheduler-job {
-        background: #f9f9f9;
-        padding: 0.75rem;
-        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: #f5f5f5;
+        border-radius: 3px;
         margin-bottom: 0.5rem;
-        font-size: 0.9rem;
+    }
+    
+    .scheduler-job:last-child {
+        margin-bottom: 0;
     }
     
     .scheduler-job-name {
+        font-size: 0.85rem;
         font-weight: 500;
-        color: #333;
+        color: #313131;
     }
     
     .scheduler-job-next {
-        color: #666;
-        font-size: 0.85rem;
-    }
-    
-    .status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        border-radius: 3px;
         font-size: 0.8rem;
-        font-weight: 500;
+        color: #666;
     }
     
-    .status-running {
-        background-color: #d4edda;
-        color: #155724;
+    .scheduler-empty {
+        color: #666;
+        font-size: 0.9rem;
+        font-style: italic;
     }
     
-    .status-stopped {
-        background-color: #f8d7da;
-        color: #721c24;
+    /* Alert - Clarity Style */
+    .alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 3px;
+        margin-bottom: 1.25rem;
+        font-size: 0.875rem;
+    }
+    
+    .alert::before {
+        flex-shrink: 0;
+        font-size: 1rem;
+        line-height: 1.4;
+    }
+    
+    .alert-content {
+        flex: 1;
+    }
+    
+    .alert-warning {
+        background-color: #fff8e1;
+        border: 1px solid #ffe082;
+        color: #856404;
+    }
+    
+    .alert-warning::before {
+        content: "⚠";
+    }
+    
+    .alert-list {
+        margin: 0.5rem 0 0 0;
+        padding-left: 1.25rem;
+    }
+    
+    .alert-list li {
+        margin-bottom: 0.25rem;
+    }
+    
+    .alert-list li:last-child {
+        margin-bottom: 0;
+    }
+    
+    /* Status Message */
+    .status-message {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 3px;
+        font-size: 0.875rem;
+    }
+    
+    .status-message.status-info {
+        background-color: #e1f5fe;
+        border: 1px solid #b3e5fc;
+        color: #01579b;
+    }
+    
+    .status-message.status-success {
+        background-color: #e6f4ea;
+        border: 1px solid #b7e1cd;
+        color: #1e7e34;
+    }
+    
+    .status-message.status-error {
+        background-color: #fce8e6;
+        border: 1px solid #f5c6cb;
+        color: #c92100;
+    }
+    
+    .text-muted {
+        color: #666;
     }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    async function loadStorageInfo() {
+        const storageDiv = document.getElementById('storage-info');
+        storageDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading storage information...</span></div>';
+        
+        try {
+            const response = await fetch('/api/storage-info');
+            if (response.ok) {
+                const data = await response.json();
+                
+                const diskPercent = data.disk_total > 0 ? ((data.disk_total - data.disk_free) / data.disk_total * 100) : 0;
+                const diskBarClass = diskPercent > 90 ? 'high' : (diskPercent > 70 ? 'medium' : 'low');
+                
+                storageDiv.innerHTML = `
+                    <div class="storage-item">
+                        <div class="storage-item-info">
+                            <div class="storage-item-label">Database</div>
+                            <div class="storage-item-path">${data.database_path || 'instance/'}</div>
+                        </div>
+                        <div>
+                            <div class="storage-item-size">${data.database_size || 'N/A'}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="storage-item">
+                        <div class="storage-item-info">
+                            <div class="storage-item-label">Log Files</div>
+                            <div class="storage-item-path">logs/</div>
+                        </div>
+                        <div>
+                            <div class="storage-item-size">${data.logs_size || 'N/A'}</div>
+                            <div class="storage-item-detail">${data.logs_count || 0} files</div>
+                        </div>
+                    </div>
+                    
+                    <div class="disk-space-section">
+                        <div class="disk-space-header">
+                            <span class="disk-space-label">Disk Space</span>
+                            <span class="disk-space-value">${data.disk_free || 'N/A'} free of ${data.disk_total_human || 'N/A'}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill ${diskBarClass}" style="width: ${diskPercent.toFixed(1)}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading storage info:', error);
+            storageDiv.innerHTML = '<p class="text-muted">Unable to load storage information</p>';
+        }
+    }
+    
     async function loadSchedulerStatus() {
+        const statusDiv = document.getElementById('scheduler-status');
+        statusDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading scheduler status...</span></div>';
+        
         try {
             const response = await fetch('/api/scheduler/status');
             if (response.ok) {
                 const data = await response.json();
-                const statusDiv = document.getElementById('scheduler-status');
                 
                 let html = `
-                    <p>
-                        <strong>Status:</strong> 
-                        <span class="status-badge ${data.running ? 'status-running' : 'status-stopped'}">
+                    <div class="scheduler-header">
+                        <span class="scheduler-status-label">Status:</span>
+                        <span class="status-badge ${data.running ? 'status-badge-success' : 'status-badge-danger'}">
                             ${data.running ? 'Running' : 'Stopped'}
                         </span>
-                    </p>
-                    <p><strong>Scheduled Jobs:</strong> ${data.job_count}</p>
+                    </div>
                 `;
                 
                 if (data.jobs && data.jobs.length > 0) {
-                    html += '<div class="scheduler-jobs">';
+                    html += `
+                        <div class="scheduler-jobs">
+                            <div class="scheduler-jobs-title">Scheduled Jobs (${data.job_count})</div>
+                    `;
+                    
                     for (const job of data.jobs) {
                         const nextRun = job.next_run_time ? new Date(job.next_run_time).toLocaleString() : 'Not scheduled';
                         html += `
                             <div class="scheduler-job">
-                                <div class="scheduler-job-name">${job.id}</div>
-                                <div class="scheduler-job-next">Next run: ${nextRun}</div>
+                                <span class="scheduler-job-name">${job.id}</span>
+                                <span class="scheduler-job-next">Next: ${nextRun}</span>
                             </div>
                         `;
                     }
+                    
                     html += '</div>';
+                } else {
+                    html += '<p class="scheduler-empty">No scheduled jobs</p>';
                 }
                 
                 statusDiv.innerHTML = html;
             }
         } catch (error) {
             console.error('Error loading scheduler status:', error);
-            document.getElementById('scheduler-status').innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
+            statusDiv.innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
         }
     }
     
@@ -267,9 +605,12 @@
         }
         
         const statusDiv = document.getElementById('restart-status');
+        const restartBtn = document.getElementById('restart-btn');
+        
         statusDiv.style.display = 'block';
-        statusDiv.className = 'alert alert-info';
-        statusDiv.innerHTML = '🔄 Restarting server... Please wait...';
+        statusDiv.className = 'status-message status-info';
+        statusDiv.innerHTML = '<span class="spinner" style="display: inline-block; margin-right: 0.5rem;"></span> Restarting server...';
+        restartBtn.disabled = true;
         
         try {
             const response = await fetch('/api/restart-server', {
@@ -277,7 +618,7 @@
             });
             
             if (response.ok) {
-                statusDiv.className = 'alert alert-success';
+                statusDiv.className = 'status-message status-success';
                 statusDiv.innerHTML = '✓ Server restart initiated. You will be redirected to the login page in 5 seconds...';
                 
                 setTimeout(() => {
@@ -285,21 +626,21 @@
                 }, 5000);
             } else {
                 const data = await response.json();
-                statusDiv.className = 'alert alert-danger';
+                statusDiv.className = 'status-message status-error';
                 statusDiv.innerHTML = `✕ Failed to restart server: ${data.error || 'Unknown error'}`;
+                restartBtn.disabled = false;
             }
         } catch (error) {
             console.error('Error restarting server:', error);
-            statusDiv.className = 'alert alert-danger';
+            statusDiv.className = 'status-message status-error';
             statusDiv.innerHTML = '✕ Failed to restart server. Please try again or restart manually.';
+            restartBtn.disabled = false;
         }
     }
     
     document.addEventListener('DOMContentLoaded', function() {
+        loadStorageInfo();
         loadSchedulerStatus();
-        
-        // Set Python version
-        document.getElementById('python-version').textContent = '{{ python_version }}';
     });
 </script>
 {% endblock %}

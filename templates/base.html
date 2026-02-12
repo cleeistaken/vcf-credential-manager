@@ -76,65 +76,61 @@
             margin: 0 auto;
         }
         
-        /* Alerts */
+        /* Alerts - Clarity Style */
         .alert {
-            padding: 1rem 1rem 1rem 3rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
             margin-bottom: 1rem;
-            border-radius: 4px;
-            border-left: 4px solid;
-            position: relative;
+            border-radius: 3px;
+            font-size: 0.875rem;
         }
         
         .alert::before {
-            content: "ℹ";
-            position: absolute;
-            left: 1rem;
-            font-size: 1.25rem;
-            font-weight: bold;
+            flex-shrink: 0;
+            font-size: 1rem;
+            line-height: 1.4;
         }
         
         .alert-success {
-            background-color: #e1f5e1;
-            border-color: #62a420;
-            color: #2d5016;
+            background-color: #e6f4ea;
+            border: 1px solid #b7e1cd;
+            color: #1e7e34;
         }
         
         .alert-success::before {
             content: "✓";
-            color: #62a420;
         }
         
         .alert-danger {
-            background-color: #ffeaea;
-            border-color: #c92100;
-            color: #5c0f00;
+            background-color: #fce8e6;
+            border: 1px solid #f5c6cb;
+            color: #c92100;
         }
         
         .alert-danger::before {
             content: "✕";
-            color: #c92100;
         }
         
         .alert-info {
-            background-color: #e1f1f6;
-            border-color: #0072a3;
-            color: #003d5c;
+            background-color: #e1f5fe;
+            border: 1px solid #b3e5fc;
+            color: #01579b;
         }
         
         .alert-info::before {
             content: "ℹ";
-            color: #0072a3;
         }
         
         .alert-warning {
-            background-color: #fff3cd;
-            border-color: #ffc107;
+            background-color: #fff8e1;
+            border: 1px solid #ffe082;
             color: #856404;
         }
         
         .alert-warning::before {
             content: "⚠";
-            color: #ffc107;
         }
         
         /* Buttons */
@@ -200,11 +196,14 @@
         }
         
         .btn-danger {
-            color: #c92100 !important;
+            background-color: #c92100;
+            border: 1px solid #c92100;
+            color: #fff !important;
         }
         
         .btn-danger:hover {
-            background-color: rgba(201, 33, 0, 0.1);
+            background-color: #a01a00;
+            border-color: #a01a00;
         }
         
         /* Cards */

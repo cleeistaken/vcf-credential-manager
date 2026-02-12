@@ -4,168 +4,237 @@
 
 {% block content %}
 <div class="environment-view-container">
+    <!-- Page Header -->
     <div class="page-header">
         <div class="header-content">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
-                ← Back to Dashboard
+            <a href="{{ url_for('dashboard') }}" class="btn btn-link">
+                <span class="btn-icon">←</span> Back to Dashboard
             </a>
             <h1>{{ environment.name }}</h1>
             {% if environment.description %}
-            <p class="p6">{{ environment.description }}</p>
+            <p class="header-description">{{ environment.description }}</p>
             {% endif %}
         </div>
         
-        <div class="header-actions">
+        <div class="header-actions btn-group">
             {% if current_user.role != 'readonly' %}
-            <button class="btn btn-sm btn-outline" onclick="syncCredentials()">
-                🔄 Sync Now
+            <button class="btn btn-primary" onclick="syncCredentials()" id="sync-btn">
+                <span class="btn-icon">🔄</span> Sync Now
             </button>
             {% endif %}
-            <button class="btn btn-sm btn-success-outline" onclick="exportCSV()">
-                📄 Export CSV
+            <button class="btn btn-success-outline" onclick="exportCSV()">
+                <span class="btn-icon">📄</span> Export CSV
             </button>
-            <button class="btn btn-sm btn-success-outline" onclick="exportExcel()">
-                📊 Export Excel
+            <button class="btn btn-success-outline" onclick="exportExcel()">
+                <span class="btn-icon">📊</span> Export Excel
             </button>
             {% if current_user.role == 'admin' or current_user.is_admin %}
-            <div class="dropdown" style="position: relative; display: inline-block;">
-                <button class="btn btn-sm btn-outline" onclick="toggleExportConfigDropdown()">
-                    ⚙️ Export Config ▾
+            <div class="btn-group-overflow">
+                <button class="btn btn-outline" onclick="toggleExportConfigDropdown()" id="config-dropdown-btn">
+                    <span class="btn-icon">⚙️</span> Export Config <span class="caret">▾</span>
                 </button>
-                <div id="export-config-dropdown" class="dropdown-menu" style="display: none;">
-                    <a href="#" onclick="exportConfigJSON(); return false;">📄 JSON Format</a>
-                    <a href="#" onclick="exportConfigYAML(); return false;">📄 YAML Format</a>
+                <div id="export-config-dropdown" class="dropdown-menu">
+                    <button class="dropdown-item" onclick="exportConfigJSON()">
+                        <span class="dropdown-icon">📄</span> JSON Format
+                    </button>
+                    <button class="dropdown-item" onclick="exportConfigYAML()">
+                        <span class="dropdown-icon">📄</span> YAML Format
+                    </button>
                 </div>
             </div>
             {% endif %}
         </div>
     </div>
     
-    <div class="environment-info">
-        <div class="clr-row">
-            {% if environment.installer_host %}
-            <div class="col-4">
-                <div class="info-card">
-                    <div style="font-size: 24px;">🖥️</div>
-                    <div>
-                        <div class="info-label">VCF Installer</div>
-                        <div class="info-value">{{ environment.installer_host }}</div>
-                    </div>
-                </div>
+    <!-- Sync Progress Bar -->
+    <div id="sync-progress-container" class="progress-container" style="display: none;">
+        <div class="progress-header">
+            <span class="progress-title">Syncing Credentials</span>
+            <span class="progress-status" id="sync-status-text">Initializing...</span>
+        </div>
+        <div class="progress labeled" id="progress-wrapper">
+            <div class="progress-track">
+                <progress id="sync-progress-bar" max="100" value="0"></progress>
+                <div class="progress-indeterminate-bar" id="indeterminate-bar"></div>
             </div>
-            {% endif %}
-            
-            {% if environment.manager_host %}
-            <div class="col-4">
-                <div class="info-card">
-                    <div style="font-size: 24px;">🖥️</div>
-                    <div>
-                        <div class="info-label">SDDC Manager</div>
-                        <div class="info-value">{{ environment.manager_host }}</div>
-                    </div>
-                </div>
+            <span id="sync-progress-label">0%</span>
+        </div>
+        <div class="progress-steps">
+            <div class="progress-step" id="step-installer">
+                <span class="step-indicator">○</span>
+                <span class="step-label">VCF Installer</span>
             </div>
-            {% endif %}
-            
-            <div class="col-4">
-                <div class="info-card">
-                    <div style="font-size: 24px;">🕐</div>
-                    <div>
-                        <div class="info-label">Last Sync</div>
-                        <div class="info-value">
-                            {% if environment.last_sync %}
-                            {{ environment.last_sync.strftime('%Y-%m-%d %H:%M:%S') }}
-                            {% else %}
-                            Never
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+            <div class="progress-step" id="step-manager">
+                <span class="step-indicator">○</span>
+                <span class="step-label">SDDC Manager</span>
+            </div>
+            <div class="progress-step" id="step-complete">
+                <span class="step-indicator">○</span>
+                <span class="step-label">Complete</span>
             </div>
         </div>
     </div>
     
-    <div class="credentials-section">
-        <h3>Credentials</h3>
+    <!-- Environment Info Cards -->
+    <div class="card-grid">
+        {% if environment.installer_host %}
+        <div class="card">
+            <div class="card-header">
+                <span class="card-icon">🖥️</span>
+                <h4 class="card-title">VCF Installer</h4>
+            </div>
+            <div class="card-block">
+                <div class="card-text">{{ environment.installer_host }}</div>
+                {% if environment.installer_error %}
+                <div class="card-alert alert-danger">
+                    <span class="alert-icon">⚠️</span> {{ environment.installer_error }}
+                </div>
+                {% endif %}
+                <div class="card-meta">
+                    <span class="meta-label">Sync:</span>
+                    {% if environment.installer_sync_enabled %}
+                    <span class="badge badge-success">Every {{ environment.installer_sync_interval_minutes }}m</span>
+                    {% else %}
+                    <span class="badge badge-secondary">Disabled</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
         
-        <div class="search-filter">
-            <input type="text" id="search-input" class="clr-input" placeholder="Search credentials..." onkeyup="applyFilters()">
+        {% if environment.manager_host %}
+        <div class="card">
+            <div class="card-header">
+                <span class="card-icon">🖥️</span>
+                <h4 class="card-title">SDDC Manager</h4>
+            </div>
+            <div class="card-block">
+                <div class="card-text">{{ environment.manager_host }}</div>
+                {% if environment.manager_error %}
+                <div class="card-alert alert-danger">
+                    <span class="alert-icon">⚠️</span> {{ environment.manager_error }}
+                </div>
+                {% endif %}
+                <div class="card-meta">
+                    <span class="meta-label">Sync:</span>
+                    {% if environment.manager_sync_enabled %}
+                    <span class="badge badge-success">Every {{ environment.manager_sync_interval_minutes }}m</span>
+                    {% else %}
+                    <span class="badge badge-secondary">Disabled</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="card">
+            <div class="card-header">
+                <span class="card-icon">🕐</span>
+                <h4 class="card-title">Last Sync</h4>
+            </div>
+            <div class="card-block">
+                <div class="card-text {% if environment.last_sync_status == 'failed' %}text-danger{% elif environment.last_sync_status == 'partial' %}text-warning{% endif %}">
+                    {% if environment.last_sync %}
+                    {{ environment.last_sync.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {% else %}
+                    Never
+                    {% endif %}
+                </div>
+                {% if environment.last_sync_status and environment.last_sync_status != 'never' %}
+                <div class="card-meta">
+                    <span class="meta-label">Status:</span>
+                    {% if environment.last_sync_status == 'success' %}
+                    <span class="badge badge-success">Success</span>
+                    {% elif environment.last_sync_status == 'partial' %}
+                    <span class="badge badge-warning">Partial</span>
+                    {% elif environment.last_sync_status == 'failed' %}
+                    <span class="badge badge-danger">Failed</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
         </div>
         
-        <div id="loading-spinner" style="display: none; text-align: center; padding: 2rem;">
-            <span class="spinner"></span>
-            <span style="margin-left: 0.5rem;">Loading...</span>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-icon">🔑</span>
+                <h4 class="card-title">Credentials</h4>
+            </div>
+            <div class="card-block">
+                <div class="card-text" id="credential-count">Loading...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Credentials Section -->
+    <div class="credentials-card">
+        <div class="card-header">
+            <h3 class="card-title">Credentials</h3>
+            <div class="card-header-actions">
+                <input type="text" id="search-input" class="clr-input search-input" placeholder="Search credentials..." onkeyup="applyFilters()">
+            </div>
         </div>
         
-        <table class="table table-compact" id="credentials-table">
-            <thead>
-                <tr>
-                    <th>Hostname</th>
-                    <th>Username</th>
-                    <th>Password</th>
-                    <th>Credential Type</th>
-                    <th>Account Type</th>
-                    <th>Resource Type</th>
-                    <th>Domain</th>
-                    <th>Source</th>
-                    <th>Last Updated</th>
-                    <th>Actions</th>
-                </tr>
-                <tr class="filter-row">
-                    <th>
-                        <input type="text" class="filter-input" id="filter-hostname" placeholder="Filter..." onkeyup="applyFilters()">
-                    </th>
-                    <th>
-                        <input type="text" class="filter-input" id="filter-username" placeholder="Filter..." onkeyup="applyFilters()">
-                    </th>
-                    <th></th>
-                    <th>
-                        <select class="filter-select" id="filter-credential-type" onchange="applyFilters()">
-                            <option value="">All</option>
-                        </select>
-                    </th>
-                    <th>
-                        <select class="filter-select" id="filter-account-type" onchange="applyFilters()">
-                            <option value="">All</option>
-                        </select>
-                    </th>
-                    <th>
-                        <select class="filter-select" id="filter-resource-type" onchange="applyFilters()">
-                            <option value="">All</option>
-                        </select>
-                    </th>
-                    <th>
-                        <input type="text" class="filter-input" id="filter-domain" placeholder="Filter..." onkeyup="applyFilters()">
-                    </th>
-                    <th>
-                        <select class="filter-select" id="filter-source" onchange="applyFilters()">
-                            <option value="">All</option>
-                            <option value="VCF_INSTALLER">Installer</option>
-                            <option value="SDDC_MANAGER">Manager</option>
-                        </select>
-                    </th>
-                    <th></th>
-                    <th>
-                        <button class="btn btn-sm btn-link" onclick="clearFilters()" title="Clear all filters">🔄 Clear</button>
-                    </th>
-                </tr>
-            </thead>
-            <tbody id="credentials-tbody">
-                <!-- Credentials will be loaded via JavaScript -->
-            </tbody>
-        </table>
-        
-        <div id="no-credentials" style="display: none;">
-            <div class="alert alert-info">
-                No credentials found. Click "Sync Now" to fetch credentials.
+        <div class="card-block">
+            <!-- Loading State -->
+            <div id="loading-spinner" class="loading-state">
+                <div class="spinner-container">
+                    <span class="spinner spinner-md"></span>
+                    <span class="spinner-text">Loading credentials...</span>
+                </div>
+            </div>
+            
+            <!-- Credentials Table -->
+            <div id="credentials-table-container" style="display: none;">
+                <table class="table" id="credentials-table">
+                    <thead>
+                        <tr>
+                            <th>Hostname</th>
+                            <th>Username</th>
+                            <th>Password</th>
+                            <th>Credential Type</th>
+                            <th>Account Type</th>
+                            <th>Resource Type</th>
+                            <th>Domain</th>
+                            <th>Source</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                        <tr class="filter-row">
+                            <th><input type="text" class="filter-input" id="filter-hostname" placeholder="Filter..." onkeyup="applyFilters()"></th>
+                            <th><input type="text" class="filter-input" id="filter-username" placeholder="Filter..." onkeyup="applyFilters()"></th>
+                            <th></th>
+                            <th><select class="filter-select" id="filter-credential-type" onchange="applyFilters()"><option value="">All</option></select></th>
+                            <th><select class="filter-select" id="filter-account-type" onchange="applyFilters()"><option value="">All</option></select></th>
+                            <th><select class="filter-select" id="filter-resource-type" onchange="applyFilters()"><option value="">All</option></select></th>
+                            <th><input type="text" class="filter-input" id="filter-domain" placeholder="Filter..." onkeyup="applyFilters()"></th>
+                            <th><select class="filter-select" id="filter-source" onchange="applyFilters()"><option value="">All</option><option value="VCF_INSTALLER">Installer</option><option value="SDDC_MANAGER">Manager</option></select></th>
+                            <th></th>
+                            <th><button class="btn btn-link btn-sm" onclick="clearFilters()">Clear</button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="credentials-tbody"></tbody>
+                </table>
+            </div>
+            
+            <!-- Empty State -->
+            <div id="no-credentials" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">🔑</div>
+                <h4 class="empty-state-title">No Credentials Found</h4>
+                <p class="empty-state-text">Click "Sync Now" to fetch credentials from the VCF environment.</p>
+                {% if current_user.role != 'readonly' %}
+                <button class="btn btn-primary" onclick="syncCredentials()">
+                    <span class="btn-icon">🔄</span> Sync Now
+                </button>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Copy notification -->
-<div id="copy-notification" class="alert alert-success" style="display: none; position: fixed; top: 80px; right: 20px; z-index: 1000; min-width: 250px;">
-    Copied to clipboard!
+<!-- Copy Notification -->
+<div id="copy-notification" class="alert alert-success notification-toast">
+    <span class="alert-icon">✓</span> Copied to clipboard!
 </div>
 
 <!-- Password History Modal -->
@@ -174,26 +243,32 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Password History</h3>
-                <button class="btn-close" onclick="closeHistoryModal()" title="Close">&times;</button>
+                <h3 class="modal-title">Password History</h3>
+                <button class="close" onclick="closeHistoryModal()" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
-                <div id="history-credential-info" style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f8f8; border-radius: 4px;">
-                    <div><strong>Hostname:</strong> <span id="history-hostname"></span></div>
-                    <div><strong>Username:</strong> <span id="history-username"></span></div>
-                    <div><strong>Current Password:</strong> <span id="history-current-password" class="password-hidden"></span>
-                        <button class="btn btn-sm btn-link" onclick="toggleHistoryPassword('history-current-password')" title="Show/Hide">👁️</button>
+                <div class="history-credential-info">
+                    <div class="info-row"><span class="info-label">Hostname:</span> <span id="history-hostname"></span></div>
+                    <div class="info-row"><span class="info-label">Username:</span> <span id="history-username"></span></div>
+                    <div class="info-row">
+                        <span class="info-label">Current Password:</span> 
+                        <span id="history-current-password" class="password-hidden"></span>
+                        <button class="btn btn-link btn-icon-only" onclick="toggleHistoryPassword('history-current-password')" title="Show/Hide">👁️</button>
                     </div>
-                    <div><strong>Last Updated:</strong> <span id="history-last-updated"></span></div>
+                    <div class="info-row"><span class="info-label">Last Updated:</span> <span id="history-last-updated"></span></div>
                 </div>
                 
                 <h4>Previous Passwords</h4>
-                <div id="history-loading" style="text-align: center; padding: 2rem;">
-                    <span class="spinner"></span>
-                    <span style="margin-left: 0.5rem;">Loading...</span>
+                <div id="history-loading" class="loading-state">
+                    <div class="spinner-container">
+                        <span class="spinner spinner-sm"></span>
+                        <span class="spinner-text">Loading...</span>
+                    </div>
                 </div>
                 <div id="history-content" style="display: none;">
-                    <table class="table table-compact">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>Password</th>
@@ -202,10 +277,9 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="history-tbody">
-                        </tbody>
+                        <tbody id="history-tbody"></tbody>
                     </table>
-                    <div id="no-history" style="display: none; padding: 2rem; text-align: center; color: #666;">
+                    <div id="no-history" class="empty-state-sm" style="display: none;">
                         No password history available
                     </div>
                 </div>
@@ -220,88 +294,600 @@
 
 {% block extra_css %}
 <style>
+    /* Container */
     .environment-view-container {
-        padding: 2rem;
+        padding: 1.5rem 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
     }
     
+    /* Page Header - Clarity Style */
     .page-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
     }
     
     .header-content h1 {
-        margin: 0.5rem 0;
+        margin: 0.5rem 0 0.25rem 0;
+        font-size: 1.5rem;
+        font-weight: 500;
+        color: #313131;
     }
     
-    .header-actions {
+    .header-description {
+        color: #666;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    /* Button Styles - Clarity Guidelines */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        padding: 0 0.75rem;
+        height: 36px;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 3px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+    
+    .btn-sm {
+        height: 24px;
+        padding: 0 0.5rem;
+        font-size: 0.55rem;
+    }
+    
+    .btn-icon {
+        font-size: 1em;
+    }
+    
+    .btn-icon-only {
+        padding: 0 0.25rem;
+        min-width: auto;
+        border: none;
+        background: transparent;
+    }
+    
+    /* Primary Button - Clarity Blue */
+    .btn-primary {
+        background-color: #0072a3;
+        border-color: #0072a3;
+        color: #fff;
+    }
+    
+    .btn-primary:hover {
+        background-color: #005a82;
+        border-color: #005a82;
+    }
+    
+    .btn-primary:active {
+        background-color: #004a6c;
+        border-color: #004a6c;
+    }
+    
+    .btn-primary:disabled {
+        background-color: #9a9a9a;
+        border-color: #9a9a9a;
+        cursor: not-allowed;
+    }
+    
+    /* Outline Button */
+    .btn-outline {
+        background-color: transparent;
+        border-color: #0072a3;
+        color: #0072a3;
+    }
+    
+    .btn-outline:hover {
+        background-color: #e8f4f8;
+    }
+    
+    /* Success Outline Button */
+    .btn-success-outline {
+        background-color: transparent;
+        border-color: #60b515;
+        color: #60b515;
+    }
+    
+    .btn-success-outline:hover {
+        background-color: #f0f9e8;
+    }
+    
+    /* Link Button */
+    .btn-link {
+        background: transparent;
+        border-color: transparent;
+        color: #0072a3;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+    }
+    
+    .btn-link:hover {
+        text-decoration: underline;
+    }
+    
+    /* Button Group */
+    .btn-group {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn-group-overflow {
+        position: relative;
+    }
+    
+    /* Dropdown Menu */
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 0.25rem;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        min-width: 160px;
+        z-index: 1000;
+    }
+    
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: transparent;
+        border: none;
+        text-align: left;
+        font-size: 0.8rem;
+        color: #313131;
+        cursor: pointer;
+    }
+    
+    .dropdown-item:hover {
+        background-color: #f0f0f0;
+    }
+    
+    .caret {
+        font-size: 0.6em;
+    }
+    
+    /* Progress Bar - Clarity Style */
+    .progress-container {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+    
+    .progress-title {
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .progress-status {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    .progress.labeled {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .progress-track {
+        flex: 1;
+        position: relative;
+        height: 0.5rem;
+        background-color: #e0e0e0;
+        border-radius: 0.25rem;
+        overflow: hidden;
+    }
+    
+    .progress-track progress {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background-color: transparent;
+        display: block;
+    }
+    
+    .progress-track progress::-webkit-progress-bar {
+        background-color: transparent;
+    }
+    
+    .progress-track progress::-webkit-progress-value {
+        background-color: #0072a3;
+        border-radius: 0.25rem;
+        transition: width 0.3s ease;
+    }
+    
+    .progress-track progress::-moz-progress-bar {
+        background-color: #0072a3;
+        border-radius: 0.25rem;
+    }
+    
+    /* Indeterminate progress bar - sliding animation */
+    .progress-indeterminate-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, 
+            transparent 0%, 
+            #0072a3 20%, 
+            #0072a3 80%, 
+            transparent 100%
+        );
+        border-radius: 0.25rem;
+        animation: indeterminate-slide 1.5s ease-in-out infinite;
+        display: none;
+    }
+    
+    .progress-indeterminate-bar.active {
+        display: block;
+    }
+    
+    @keyframes indeterminate-slide {
+        0% { 
+            transform: translateX(-100%);
+        }
+        100% { 
+            transform: translateX(250%);
+        }
+    }
+    
+    /* Success state for progress */
+    .progress-track.success progress::-webkit-progress-value {
+        background-color: #60b515;
+    }
+    
+    .progress-track.success progress::-moz-progress-bar {
+        background-color: #60b515;
+    }
+    
+    /* Error state for progress */
+    .progress-track.error progress::-webkit-progress-value {
+        background-color: #c92100;
+    }
+    
+    .progress-track.error progress::-moz-progress-bar {
+        background-color: #c92100;
+    }
+    
+    #sync-progress-label {
+        font-size: 0.85rem;
+        color: #666;
+        min-width: 3rem;
+    }
+    
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e8e8e8;
+    }
+    
+    .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    .step-indicator {
+        width: 1.25rem;
+        height: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 0.7rem;
+    }
+    
+    .progress-step.active .step-indicator {
+        background-color: #0072a3;
+        color: #fff;
+    }
+    
+    .progress-step.active .step-label {
+        color: #0072a3;
+        font-weight: 500;
+    }
+    
+    .progress-step.completed .step-indicator {
+        background-color: #60b515;
+        color: #fff;
+    }
+    
+    .progress-step.completed .step-label {
+        color: #60b515;
+    }
+    
+    .progress-step.error .step-indicator {
+        background-color: #c92100;
+        color: #fff;
+    }
+    
+    .progress-step.error .step-label {
+        color: #c92100;
+    }
+    
+    /* Card Grid */
+    .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Cards - Clarity Style */
+    .card {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    .card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .card-icon {
+        font-size: 1.25rem;
+    }
+    
+    .card-title {
+        margin: 0;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #313131;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    
+    .card-block {
+        padding: 1rem;
+    }
+    
+    .card-text {
+        font-size: 1rem;
+        color: #313131;
+        word-break: break-word;
+    }
+    
+    .card-meta {
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #666;
+    }
+    
+    .meta-label {
+        margin-right: 0.25rem;
+    }
+    
+    .card-alert {
+        margin-top: 0.75rem;
+        padding: 0.5rem;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .card-alert.alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    /* Badges - Clarity Style */
+    .badge {
+        display: inline-block;
+        padding: 0.125rem 0.5rem;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-radius: 0.5rem;
+    }
+    
+    .badge-success {
+        background-color: #60b515;
+        color: #fff;
+    }
+    
+    .badge-warning {
+        background-color: #ffc107;
+        color: #313131;
+    }
+    
+    .badge-danger {
+        background-color: #c92100;
+        color: #fff;
+    }
+    
+    .badge-secondary {
+        background-color: #6c757d;
+        color: #fff;
+    }
+    
+    /* Text Colors */
+    .text-danger { color: #c92100; }
+    .text-warning { color: #856404; }
+    
+    /* Credentials Card */
+    .credentials-card {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+    }
+    
+    .credentials-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .credentials-card .card-title {
+        font-size: 1rem;
+    }
+    
+    .card-header-actions {
         display: flex;
         gap: 0.5rem;
     }
     
-    .environment-info {
-        margin-bottom: 2rem;
+    .search-input {
+        width: 280px;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        font-size: 0.85rem;
     }
     
-    .info-card {
+    .search-input:focus {
+        outline: none;
+        border-color: #0072a3;
+        box-shadow: 0 0 0 2px rgba(0, 114, 163, 0.2);
+    }
+    
+    /* Loading State */
+    .loading-state {
+        padding: 3rem;
+        text-align: center;
+    }
+    
+    .spinner-container {
         display: flex;
         align-items: center;
-        gap: 1rem;
-        padding: 1rem;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+    
+    .spinner {
+        display: inline-block;
+        border: 3px solid #e0e0e0;
+        border-top-color: #0072a3;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    .spinner-sm {
+        width: 1rem;
+        height: 1rem;
+        border-width: 2px;
+    }
+    
+    .spinner-md {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+    
+    .spinner-text {
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Empty State */
+    .empty-state {
+        padding: 3rem;
+        text-align: center;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state-title {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.1rem;
+        color: #313131;
+    }
+    
+    .empty-state-text {
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+    
+    .empty-state-sm {
+        padding: 2rem;
+        text-align: center;
+        color: #666;
+    }
+    
+    /* Table */
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .table th {
         background: #fafafa;
-        border-radius: 4px;
-        border-left: 4px solid #0072a3;
-    }
-    
-    .info-card cds-icon {
-        --color: #0072a3;
-    }
-    
-    .info-label {
-        font-size: 0.75rem;
+        font-weight: 500;
         color: #666;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        font-size: 0.7rem;
+        letter-spacing: 0.03em;
     }
     
-    .info-value {
-        font-size: 1rem;
-        font-weight: 500;
-        margin-top: 0.25rem;
-    }
-    
-    .credentials-section {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    
-    .credentials-section h3 {
-        margin-top: 0;
-        margin-bottom: 1rem;
-    }
-    
-    .search-filter {
-        margin-bottom: 1rem;
-    }
-    
-    .search-filter input {
-        max-width: 400px;
-    }
-    
-    .table {
-        margin-top: 1rem;
-    }
-    
-    .filter-row {
+    .table tbody tr:hover {
         background-color: #f8f8f8;
     }
     
+    .filter-row {
+        background-color: #f5f5f5 !important;
+    }
+    
     .filter-row th {
-        padding: 0.5rem;
-        vertical-align: middle;
+        padding: 0.375rem;
     }
     
     .filter-input,
@@ -310,19 +896,18 @@
         padding: 0.25rem 0.5rem;
         border: 1px solid #ccc;
         border-radius: 3px;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
     }
     
     .filter-input:focus,
     .filter-select:focus {
         outline: none;
         border-color: #0072a3;
-        box-shadow: 0 0 0 2px rgba(0, 114, 163, 0.1);
     }
     
+    /* Password Cell */
     .password-cell {
-        font-family: monospace;
-        position: relative;
+        font-family: 'Consolas', 'Monaco', monospace;
     }
     
     .password-hidden {
@@ -331,27 +916,25 @@
         user-select: none;
     }
     
-    .btn-icon {
-        padding: 0.25rem;
-        min-width: auto;
+    /* Notification Toast */
+    .notification-toast {
+        display: none;
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 1100;
+        padding: 0.75rem 1rem;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     
-    .spinner {
-        display: inline-block;
-        width: 1.5rem;
-        height: 1.5rem;
-        border: 3px solid #e0e0e0;
-        border-top-color: #0072a3;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        vertical-align: middle;
+    .alert-success {
+        background-color: #dff0d8;
+        border: 1px solid #60b515;
+        color: #3c763d;
     }
     
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    
-    /* History Modal Styles */
+    /* Modal - Clarity Style */
     .modal {
         position: fixed;
         top: 0;
@@ -370,7 +953,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.65);
         z-index: 1040;
     }
     
@@ -378,19 +961,17 @@
         position: relative;
         z-index: 1060;
         width: 90%;
-        max-width: 900px;
+        max-width: 700px;
         max-height: 90vh;
-        display: flex;
-        flex-direction: column;
     }
     
     .modal-dialog.modal-lg {
-        max-width: 1000px;
+        max-width: 900px;
     }
     
     .modal-content {
-        background: white;
-        border-radius: 8px;
+        background: #fff;
+        border-radius: 3px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         display: flex;
         flex-direction: column;
@@ -398,109 +979,66 @@
     }
     
     .modal-header {
-        padding: 1.5rem;
-        border-bottom: 1px solid #dee2e6;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e8e8e8;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
     
-    .modal-header h3 {
+    .modal-title {
         margin: 0;
+        font-size: 1.1rem;
+        font-weight: 500;
     }
     
-    .btn-close {
+    .close {
         background: none;
         border: none;
-        font-size: 2rem;
+        font-size: 1.5rem;
         line-height: 1;
         cursor: pointer;
-        padding: 0;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         color: #666;
+        padding: 0;
     }
     
-    .btn-close:hover {
-        color: #000;
+    .close:hover {
+        color: #313131;
     }
     
     .modal-body {
-        padding: 1.5rem;
+        padding: 1.25rem;
         overflow-y: auto;
         flex: 1;
     }
     
     .modal-footer {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid #dee2e6;
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid #e8e8e8;
         display: flex;
         justify-content: flex-end;
         gap: 0.5rem;
     }
     
-    .credential-link {
-        text-decoration: none;
-        color: #0066cc;
-        padding: 0;
-        font-weight: normal;
-        cursor: pointer;
-        background: none;
-        border: none;
-        text-align: left;
+    .history-credential-info {
+        background: #fafafa;
+        padding: 1rem;
+        border-radius: 3px;
+        margin-bottom: 1.5rem;
     }
     
-    .credential-link:hover {
-        text-decoration: underline;
-        color: #004499;
+    .info-row {
+        margin-bottom: 0.5rem;
     }
     
-    .btn-primary {
-        background-color: #0066cc;
-        color: white;
-        border: 1px solid #0066cc;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.875rem;
-        white-space: nowrap;
+    .info-row:last-child {
+        margin-bottom: 0;
     }
     
-    .btn-primary:hover {
-        background-color: #0052a3;
-        border-color: #0052a3;
-    }
-    
-    /* Dropdown styles */
-    .dropdown {
-        position: relative;
-        display: inline-block;
-    }
-    
-    .dropdown-menu {
-        position: absolute;
-        top: 100%;
-        right: 0;
-        background: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        min-width: 150px;
-        z-index: 1000;
-    }
-    
-    .dropdown-menu a {
-        display: block;
-        padding: 0.5rem 1rem;
-        color: #333;
-        text-decoration: none;
-        white-space: nowrap;
-    }
-    
-    .dropdown-menu a:hover {
-        background-color: #f5f5f5;
+    .info-label {
+        font-weight: 500;
+        color: #666;
+        margin-right: 0.5rem;
     }
 </style>
 {% endblock %}
@@ -508,16 +1046,17 @@
 {% block extra_js %}
 <script>
     const environmentId = {{ environment.id }};
+    const hasInstaller = {{ 'true' if environment.installer_host else 'false' }};
+    const hasManager = {{ 'true' if environment.manager_host else 'false' }};
     let credentials = [];
     
-    // Load credentials on page load
     document.addEventListener('DOMContentLoaded', function() {
         loadCredentials();
     });
     
     async function loadCredentials() {
         document.getElementById('loading-spinner').style.display = 'block';
-        document.getElementById('credentials-table').style.display = 'none';
+        document.getElementById('credentials-table-container').style.display = 'none';
         document.getElementById('no-credentials').style.display = 'none';
         
         try {
@@ -525,18 +1064,19 @@
             credentials = await response.json();
             
             document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('credential-count').textContent = credentials.length + ' credentials';
             
             if (credentials.length === 0) {
                 document.getElementById('no-credentials').style.display = 'block';
             } else {
-                document.getElementById('credentials-table').style.display = 'table';
+                document.getElementById('credentials-table-container').style.display = 'block';
                 populateFilterDropdowns();
                 renderCredentials(credentials);
             }
         } catch (error) {
             console.error('Error loading credentials:', error);
             document.getElementById('loading-spinner').style.display = 'none';
-            alert('Failed to load credentials');
+            document.getElementById('credential-count').textContent = 'Error loading';
         }
     }
     
@@ -550,136 +1090,103 @@
             const sourceLabel = cred.source === 'VCF_INSTALLER' ? 'Installer' : 'Manager';
             
             tr.innerHTML = `
-                <td>${cred.hostname || ''}</td>
-                <td>${cred.username || ''}</td>
+                <td>${escapeHtml(cred.hostname || '')}</td>
+                <td>${escapeHtml(cred.username || '')}</td>
                 <td class="password-cell">
-                    <span class="password-hidden" id="pwd-${cred.id}">${cred.password || ''}</span>
+                    <span class="password-hidden" id="pwd-${cred.id}">${escapeHtml(cred.password || '')}</span>
                 </td>
-                <td>${cred.credential_type || ''}</td>
-                <td>${cred.account_type || ''}</td>
-                <td>${cred.resource_type || ''}</td>
-                <td>${cred.domain_name || ''}</td>
+                <td>${escapeHtml(cred.credential_type || '')}</td>
+                <td>${escapeHtml(cred.account_type || '')}</td>
+                <td>${escapeHtml(cred.resource_type || '')}</td>
+                <td>${escapeHtml(cred.domain_name || '')}</td>
                 <td><span title="${cred.source || 'SDDC_MANAGER'}">${sourceIcon} ${sourceLabel}</span></td>
                 <td>${cred.last_updated ? new Date(cred.last_updated).toLocaleString() : ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-link" onclick="togglePassword(${cred.id})" title="Show/Hide Password">
-                        👁️
-                    </button>
-                    <button class="btn btn-sm btn-link" onclick="copyPassword(${cred.id}, '${cred.password}')" title="Copy Password">
-                        📋
-                    </button>
-                    <button class="btn btn-sm btn-primary" onclick="showHistory(${cred.id})" title="View Password History">
-                        📜 History
-                    </button>
+                    <button class="btn btn-link btn-icon-only" onclick="togglePassword(${cred.id})" title="Show/Hide">👁️</button>
+                    <button class="btn btn-link btn-icon-only" onclick="copyPassword('${escapeHtml(cred.password)}')" title="Copy">📋</button>
+                    <button class="btn btn-link btn-sm" onclick="showHistory(${cred.id})">History</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     }
     
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
     function populateFilterDropdowns() {
-        // Get unique values for each filterable column
         const credentialTypes = [...new Set(credentials.map(c => c.credential_type).filter(v => v))].sort();
         const accountTypes = [...new Set(credentials.map(c => c.account_type).filter(v => v))].sort();
         const resourceTypes = [...new Set(credentials.map(c => c.resource_type).filter(v => v))].sort();
         
-        // Populate credential type dropdown
-        const credTypeSelect = document.getElementById('filter-credential-type');
-        credTypeSelect.innerHTML = '<option value="">All</option>';
-        credentialTypes.forEach(type => {
+        populateSelect('filter-credential-type', credentialTypes);
+        populateSelect('filter-account-type', accountTypes);
+        populateSelect('filter-resource-type', resourceTypes);
+    }
+    
+    function populateSelect(id, options) {
+        const select = document.getElementById(id);
+        select.innerHTML = '<option value="">All</option>';
+        options.forEach(opt => {
             const option = document.createElement('option');
-            option.value = type;
-            option.textContent = type;
-            credTypeSelect.appendChild(option);
-        });
-        
-        // Populate account type dropdown
-        const accountTypeSelect = document.getElementById('filter-account-type');
-        accountTypeSelect.innerHTML = '<option value="">All</option>';
-        accountTypes.forEach(type => {
-            const option = document.createElement('option');
-            option.value = type;
-            option.textContent = type;
-            accountTypeSelect.appendChild(option);
-        });
-        
-        // Populate resource type dropdown
-        const resourceTypeSelect = document.getElementById('filter-resource-type');
-        resourceTypeSelect.innerHTML = '<option value="">All</option>';
-        resourceTypes.forEach(type => {
-            const option = document.createElement('option');
-            option.value = type;
-            option.textContent = type;
-            resourceTypeSelect.appendChild(option);
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
         });
     }
     
     function togglePassword(credId) {
-        const element = document.getElementById(`pwd-${credId}`);
-        element.classList.toggle('password-hidden');
+        document.getElementById(`pwd-${credId}`).classList.toggle('password-hidden');
     }
     
-    function copyPassword(credId, password) {
+    function copyPassword(password) {
         navigator.clipboard.writeText(password).then(() => {
-            showCopyNotification();
-        }).catch(err => {
-            console.error('Failed to copy:', err);
+            const notification = document.getElementById('copy-notification');
+            notification.style.display = 'flex';
+            setTimeout(() => notification.style.display = 'none', 2000);
         });
     }
     
-    function showCopyNotification() {
-        const notification = document.getElementById('copy-notification');
-        notification.style.display = 'block';
-        setTimeout(() => {
-            notification.style.display = 'none';
-        }, 2000);
-    }
-    
     function applyFilters() {
-        // Get all filter values
         const searchTerm = document.getElementById('search-input').value.toLowerCase();
-        const hostnameFilter = document.getElementById('filter-hostname').value.toLowerCase();
-        const usernameFilter = document.getElementById('filter-username').value.toLowerCase();
-        const credentialTypeFilter = document.getElementById('filter-credential-type').value;
-        const accountTypeFilter = document.getElementById('filter-account-type').value;
-        const resourceTypeFilter = document.getElementById('filter-resource-type').value;
-        const domainFilter = document.getElementById('filter-domain').value.toLowerCase();
-        const sourceFilter = document.getElementById('filter-source').value;
+        const filters = {
+            hostname: document.getElementById('filter-hostname').value.toLowerCase(),
+            username: document.getElementById('filter-username').value.toLowerCase(),
+            credentialType: document.getElementById('filter-credential-type').value,
+            accountType: document.getElementById('filter-account-type').value,
+            resourceType: document.getElementById('filter-resource-type').value,
+            domain: document.getElementById('filter-domain').value.toLowerCase(),
+            source: document.getElementById('filter-source').value
+        };
         
-        // Apply all filters
         const filtered = credentials.filter(cred => {
-            // Search filter (searches across multiple fields)
             const matchesSearch = !searchTerm || 
                 (cred.hostname || '').toLowerCase().includes(searchTerm) ||
                 (cred.username || '').toLowerCase().includes(searchTerm) ||
-                (cred.resource_type || '').toLowerCase().includes(searchTerm) ||
-                (cred.domain_name || '').toLowerCase().includes(searchTerm);
+                (cred.resource_type || '').toLowerCase().includes(searchTerm);
             
-            // Column filters
-            const matchesHostname = !hostnameFilter || (cred.hostname || '').toLowerCase().includes(hostnameFilter);
-            const matchesUsername = !usernameFilter || (cred.username || '').toLowerCase().includes(usernameFilter);
-            const matchesCredentialType = !credentialTypeFilter || cred.credential_type === credentialTypeFilter;
-            const matchesAccountType = !accountTypeFilter || cred.account_type === accountTypeFilter;
-            const matchesResourceType = !resourceTypeFilter || cred.resource_type === resourceTypeFilter;
-            const matchesDomain = !domainFilter || (cred.domain_name || '').toLowerCase().includes(domainFilter);
-            const matchesSource = !sourceFilter || cred.source === sourceFilter;
-            
-            return matchesSearch && matchesHostname && matchesUsername && 
-                   matchesCredentialType && matchesAccountType && matchesResourceType && 
-                   matchesDomain && matchesSource;
+            return matchesSearch &&
+                (!filters.hostname || (cred.hostname || '').toLowerCase().includes(filters.hostname)) &&
+                (!filters.username || (cred.username || '').toLowerCase().includes(filters.username)) &&
+                (!filters.credentialType || cred.credential_type === filters.credentialType) &&
+                (!filters.accountType || cred.account_type === filters.accountType) &&
+                (!filters.resourceType || cred.resource_type === filters.resourceType) &&
+                (!filters.domain || (cred.domain_name || '').toLowerCase().includes(filters.domain)) &&
+                (!filters.source || cred.source === filters.source);
         });
         
         renderCredentials(filtered);
         
-        // Update table display message if no results
         if (filtered.length === 0 && credentials.length > 0) {
-            const tbody = document.getElementById('credentials-tbody');
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #666;">No credentials match the current filters</td></tr>';
+            document.getElementById('credentials-tbody').innerHTML = 
+                '<tr><td colspan="10" class="empty-state-sm">No credentials match the current filters</td></tr>';
         }
     }
     
     function clearFilters() {
-        // Clear all filter inputs
         document.getElementById('search-input').value = '';
         document.getElementById('filter-hostname').value = '';
         document.getElementById('filter-username').value = '';
@@ -688,37 +1195,172 @@
         document.getElementById('filter-resource-type').value = '';
         document.getElementById('filter-domain').value = '';
         document.getElementById('filter-source').value = '';
-        
-        // Re-render all credentials
         renderCredentials(credentials);
     }
     
+    // Sync with Progress Bar
     async function syncCredentials() {
         if (!confirm('This will fetch the latest credentials from the VCF environment. Continue?')) {
             return;
         }
         
-        document.getElementById('loading-spinner').style.display = 'block';
+        const syncBtn = document.getElementById('sync-btn');
+        const progressContainer = document.getElementById('sync-progress-container');
+        const progressBar = document.getElementById('sync-progress-bar');
+        const progressTrack = progressBar.parentElement;
+        const progressLabel = document.getElementById('sync-progress-label');
+        const indeterminateBar = document.getElementById('indeterminate-bar');
+        const statusText = document.getElementById('sync-status-text');
+        
+        // Disable sync button
+        if (syncBtn) {
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span class="btn-icon">⏳</span> Syncing...';
+        }
+        
+        // Show progress bar
+        progressContainer.style.display = 'block';
+        
+        // Reset steps and progress track state
+        resetProgressSteps();
+        progressTrack.classList.remove('success', 'error');
         
         try {
+            // Start with indeterminate progress
+            progressBar.value = 0;
+            progressBar.style.opacity = '0';
+            indeterminateBar.classList.add('active');
+            progressLabel.textContent = '';
+            
+            // Step 1: Installer (if configured)
+            if (hasInstaller) {
+                setStepActive('step-installer');
+                statusText.textContent = 'Connecting to VCF Installer...';
+                await sleep(300);
+            }
+            
+            // Step 2: Manager (if configured)  
+            if (hasManager) {
+                if (!hasInstaller) {
+                    setStepActive('step-manager');
+                }
+                statusText.textContent = hasInstaller ? 'Connecting to VCF Installer & SDDC Manager...' : 'Connecting to SDDC Manager...';
+            }
+            
+            // Actual sync call
+            statusText.textContent = 'Fetching credentials...';
+            
             const response = await fetch(`/api/environments/${environmentId}/sync`, {
                 method: 'POST'
             });
             
-            if (response.ok) {
-                await loadCredentials();
-                alert('Credentials synced successfully');
+            const result = await response.json();
+            
+            // Switch to determinate progress for completion
+            indeterminateBar.classList.remove('active');
+            progressBar.style.opacity = '1';
+            progressBar.value = 100;
+            progressLabel.textContent = '100%';
+            
+            if (response.ok || response.status === 207) {
+                // Update step indicators based on results
+                if (hasInstaller) {
+                    if (result.installer_error) {
+                        setStepError('step-installer');
+                    } else {
+                        setStepCompleted('step-installer');
+                    }
+                }
+                
+                if (hasManager) {
+                    if (result.manager_error) {
+                        setStepError('step-manager');
+                    } else {
+                        setStepCompleted('step-manager');
+                    }
+                }
+                
+                if (result.status === 'success') {
+                    setStepCompleted('step-complete');
+                    progressTrack.classList.add('success');
+                    statusText.textContent = `Sync completed! ${result.credential_count} credentials fetched.`;
+                } else if (result.status === 'partial') {
+                    setStepCompleted('step-complete');
+                    statusText.textContent = `Sync completed with errors. ${result.credential_count} credentials available.`;
+                } else {
+                    setStepError('step-complete');
+                    progressTrack.classList.add('error');
+                    statusText.textContent = 'Sync failed - check connection settings';
+                }
+                
+                // Wait a moment then reload
+                await sleep(2000);
                 location.reload();
             } else {
-                throw new Error('Sync failed');
+                throw new Error(result.error || 'Sync failed');
             }
+            
         } catch (error) {
             console.error('Error syncing credentials:', error);
-            document.getElementById('loading-spinner').style.display = 'none';
-            alert('Failed to sync credentials');
+            
+            // Switch to determinate progress showing error
+            indeterminateBar.classList.remove('active');
+            progressBar.style.opacity = '1';
+            progressBar.value = 100;
+            progressTrack.classList.add('error');
+            progressLabel.textContent = '';
+            
+            statusText.textContent = 'Error: ' + error.message;
+            setStepError('step-complete');
+            
+            // Re-enable button
+            if (syncBtn) {
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = '<span class="btn-icon">🔄</span> Sync Now';
+            }
+            
+            // Hide progress after delay
+            await sleep(4000);
+            progressContainer.style.display = 'none';
         }
     }
     
+    function updateProgress(bar, label, value) {
+        bar.value = value;
+        label.textContent = Math.round(value) + '%';
+    }
+    
+    function resetProgressSteps() {
+        ['step-installer', 'step-manager', 'step-complete'].forEach(id => {
+            const step = document.getElementById(id);
+            step.className = 'progress-step';
+            step.querySelector('.step-indicator').textContent = '○';
+        });
+    }
+    
+    function setStepActive(stepId) {
+        const step = document.getElementById(stepId);
+        step.className = 'progress-step active';
+        step.querySelector('.step-indicator').textContent = '●';
+    }
+    
+    function setStepCompleted(stepId) {
+        const step = document.getElementById(stepId);
+        step.className = 'progress-step completed';
+        step.querySelector('.step-indicator').textContent = '✓';
+    }
+    
+    function setStepError(stepId) {
+        const step = document.getElementById(stepId);
+        step.className = 'progress-step error';
+        step.querySelector('.step-indicator').textContent = '✕';
+    }
+    
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    // Export functions
     function exportCSV() {
         window.location.href = `/api/environments/${environmentId}/export/csv`;
     }
@@ -727,109 +1369,14 @@
         window.location.href = `/api/environments/${environmentId}/export/excel`;
     }
     
-    // Password History Functions
-    async function showHistory(credId) {
-        const modal = document.getElementById('history-modal');
-        const loading = document.getElementById('history-loading');
-        const content = document.getElementById('history-content');
-        
-        modal.style.display = 'block';
-        loading.style.display = 'block';
-        content.style.display = 'none';
-        
-        try {
-            const response = await fetch(`/api/credentials/${credId}/history`);
-            if (!response.ok) throw new Error('Failed to load history');
-            
-            const data = await response.json();
-            
-            // Update credential info
-            document.getElementById('history-hostname').textContent = data.credential.hostname;
-            document.getElementById('history-username').textContent = data.credential.username;
-            document.getElementById('history-current-password').textContent = data.credential.current_password;
-            document.getElementById('history-last-updated').textContent = 
-                data.credential.last_updated ? new Date(data.credential.last_updated).toLocaleString() : 'Never';
-            
-            // Render history table
-            const tbody = document.getElementById('history-tbody');
-            tbody.innerHTML = '';
-            
-            if (data.history && data.history.length > 0) {
-                data.history.forEach((entry, index) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="password-cell">
-                            <span class="password-hidden" id="hist-pwd-${index}">${entry.password}</span>
-                        </td>
-                        <td>${entry.changed_at ? new Date(entry.changed_at).toLocaleString() : ''}</td>
-                        <td>${entry.changed_by || 'SYSTEM'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-link" onclick="toggleHistoryPassword('hist-pwd-${index}')" title="Show/Hide">
-                                👁️
-                            </button>
-                            <button class="btn btn-sm btn-link" onclick="copyHistoryPassword('${entry.password}')" title="Copy">
-                                📋
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-                document.getElementById('no-history').style.display = 'none';
-            } else {
-                document.getElementById('no-history').style.display = 'block';
-            }
-            
-            loading.style.display = 'none';
-            content.style.display = 'block';
-        } catch (error) {
-            console.error('Error loading history:', error);
-            alert('Failed to load password history');
-            closeHistoryModal();
-        }
-    }
-    
-    function closeHistoryModal() {
-        document.getElementById('history-modal').style.display = 'none';
-    }
-    
-    function toggleHistoryPassword(elementId) {
-        const element = document.getElementById(elementId);
-        element.classList.toggle('password-hidden');
-    }
-    
-    function copyHistoryPassword(password) {
-        navigator.clipboard.writeText(password).then(() => {
-            showCopyNotification();
-        }).catch(err => {
-            console.error('Failed to copy:', err);
-        });
-    }
-    
-    // Close modal when clicking outside
-    document.addEventListener('click', function(event) {
-        const modal = document.getElementById('history-modal');
-        if (event.target === modal) {
-            closeHistoryModal();
-        }
-    });
-    
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            closeHistoryModal();
-        }
-    });
-    
-    // Export Config Functions (Admin only)
     function toggleExportConfigDropdown() {
         const dropdown = document.getElementById('export-config-dropdown');
         dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
     }
     
-    // Close dropdown when clicking outside
     document.addEventListener('click', function(event) {
         const dropdown = document.getElementById('export-config-dropdown');
-        if (dropdown && !event.target.closest('.dropdown')) {
+        if (dropdown && !event.target.closest('.btn-group-overflow')) {
             dropdown.style.display = 'none';
         }
     });
@@ -843,6 +1390,71 @@
         window.location.href = `/api/environments/${environmentId}/export/config?format=yaml`;
         document.getElementById('export-config-dropdown').style.display = 'none';
     }
+    
+    // Password History Modal
+    async function showHistory(credId) {
+        const modal = document.getElementById('history-modal');
+        const loading = document.getElementById('history-loading');
+        const content = document.getElementById('history-content');
+        
+        modal.style.display = 'flex';
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/credentials/${credId}/history`);
+            if (!response.ok) throw new Error('Failed to load history');
+            
+            const data = await response.json();
+            
+            document.getElementById('history-hostname').textContent = data.credential.hostname;
+            document.getElementById('history-username').textContent = data.credential.username;
+            document.getElementById('history-current-password').textContent = data.credential.current_password;
+            document.getElementById('history-last-updated').textContent = 
+                data.credential.last_updated ? new Date(data.credential.last_updated).toLocaleString() : 'Never';
+            
+            const tbody = document.getElementById('history-tbody');
+            tbody.innerHTML = '';
+            
+            if (data.history && data.history.length > 0) {
+                data.history.forEach((entry, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="password-cell">
+                            <span class="password-hidden" id="hist-pwd-${index}">${escapeHtml(entry.password)}</span>
+                        </td>
+                        <td>${entry.changed_at ? new Date(entry.changed_at).toLocaleString() : ''}</td>
+                        <td>${entry.changed_by || 'SYSTEM'}</td>
+                        <td>
+                            <button class="btn btn-link btn-icon-only" onclick="toggleHistoryPassword('hist-pwd-${index}')" title="Show/Hide">👁️</button>
+                            <button class="btn btn-link btn-icon-only" onclick="copyPassword('${escapeHtml(entry.password)}')" title="Copy">📋</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('no-history').style.display = 'none';
+            } else {
+                document.getElementById('no-history').style.display = 'block';
+            }
+            
+            loading.style.display = 'none';
+            content.style.display = 'block';
+        } catch (error) {
+            console.error('Error loading history:', error);
+            closeHistoryModal();
+        }
+    }
+    
+    function closeHistoryModal() {
+        document.getElementById('history-modal').style.display = 'none';
+    }
+    
+    function toggleHistoryPassword(elementId) {
+        document.getElementById(elementId).classList.toggle('password-hidden');
+    }
+    
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') closeHistoryModal();
+    });
 </script>
 {% endblock %}
-
