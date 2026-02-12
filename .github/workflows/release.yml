@@ -9,47 +9,18 @@ jobs:
   release:
     permissions: write-all
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10"]
 
     steps:
-    - name: Display trigger information
-      run: |
-        echo "🎉 Release triggered by tag push: ${{ github.ref }}"
-        echo "🐧 Running on: ${{ runner.os }}"
-        echo "📦 Repository: ${{ github.repository }}"
-
     - name: Check out repository code
       uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
 
     - name: Get version from tag
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-    - name: List repository files
-      run: |
-        echo "📁 Repository contents:"
-        ls -la
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run basic validation
-      run: |
-        python -c "import app; print('✅ Application imports successfully')"
-
     - name: Create release archive
       run: |
-        # Create a clean release archive excluding unnecessary files
-        zip -r vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip . \
+        zip -r vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.zip . \
           -x "*.git*" \
           -x "*.idea/*" \
           -x "*__pycache__/*" \
@@ -68,8 +39,6 @@ jobs:
 
     - name: Create tarball archive
       run: |
-        # Create a tarball for Linux users
-        # Use --ignore-failed-read and || true to handle "file changed as we read it" warnings
         tar --exclude='.git' \
             --exclude='.idea' \
             --exclude='__pycache__' \
@@ -88,13 +57,12 @@ jobs:
             --exclude='*.zip' \
             --exclude='*.tar.gz' \
             --ignore-failed-read \
-            -czvf vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz . || [[ $? -eq 1 ]]
+            -czvf vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.tar.gz . || [[ $? -eq 1 ]]
 
     - name: Generate release notes
-      id: release_notes
       run: |
         cat << 'EOF' > release_notes.md
-        ## VCF Credentials Fetch ${{ steps.get_version.outputs.VERSION }}
+        ## VCF Credentials Manager ${{ steps.get_version.outputs.VERSION }}
         
         ### Installation
         
@@ -106,8 +74,8 @@ jobs:
         
         ```bash
         # Extract the archive
-        unzip vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-fetch
-        cd vcf-credentials-fetch
+        unzip vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-manager
+        cd vcf-credentials-manager
         
         # Install dependencies
         pip install -r requirements.txt
@@ -136,14 +104,7 @@ jobs:
         draft: false
         prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
         files: |
-          vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip
-          vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz
+          vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.zip
+          vcf-credentials-manager-${{ steps.get_version.outputs.VERSION }}.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Release summary
-      run: |
-        echo "✅ Release ${{ steps.get_version.outputs.VERSION }} created successfully!"
-        echo "📦 Assets uploaded:"
-        echo "   - vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.zip"
-        echo "   - vcf-credentials-fetch-${{ steps.get_version.outputs.VERSION }}.tar.gz"
