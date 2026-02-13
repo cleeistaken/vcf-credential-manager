@@ -1,9 +1,9 @@
 {
-  "version": "3edfbda",
+  "version": "780e600",
   "build_type": "development",
   "branch": "main",
-  "commit": "3edfbdaa8e922585b0397a40e8f0b473c290bf13",
-  "commit_short": "3edfbda",
-  "build_date": "2026-02-12",
-  "build_timestamp": "2026-02-12T23:51:22Z"
+  "commit": "780e600ca7e51c58ef03302fa61074f593520d2a",
+  "commit_short": "780e600",
+  "build_date": "2026-02-13",
+  "build_timestamp": "2026-02-13T01:50:58Z"
 }
