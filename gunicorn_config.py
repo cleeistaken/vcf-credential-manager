@@ -35,8 +35,9 @@ user = None
 group = None
 tmp_upload_dir = None
 
-# Preload app to initialize database before forking workers
-preload_app = True
+# Don't preload app - let each worker initialize its own scheduler
+# This ensures the BackgroundScheduler thread is created in the worker process
+preload_app = False
 
 # macOS-specific: Disable fork safety for Objective-C frameworks
 # This prevents crashes when fork() is called with Objective-C initialized

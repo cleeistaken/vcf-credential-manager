@@ -55,9 +55,14 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Scheduler Status</h3>
-            <button class="btn btn-outline btn-sm" onclick="loadSchedulerStatus()">
-                Refresh
-            </button>
+            <div class="card-header-actions">
+                <button class="btn btn-outline btn-sm" onclick="rescheduleAllJobs()" id="reschedule-btn">
+                    Reschedule All
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="loadSchedulerStatus()">
+                    Refresh
+                </button>
+            </div>
         </div>
         <div class="card-block">
             <div id="scheduler-status">
@@ -66,6 +71,7 @@
                     <span>Loading scheduler status...</span>
                 </div>
             </div>
+            <div id="reschedule-status" class="status-message" style="display: none; margin-top: 1rem;"></div>
         </div>
     </div>
     
@@ -430,6 +436,12 @@
         background-color: #c92100;
     }
     
+    /* Card Header Actions */
+    .card-header-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
     /* Scheduler Status */
     .scheduler-header {
         display: flex;
@@ -737,6 +749,47 @@
         } catch (error) {
             console.error('Error loading scheduler status:', error);
             statusDiv.innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
+        }
+    }
+    
+    async function rescheduleAllJobs() {
+        const statusDiv = document.getElementById('reschedule-status');
+        const rescheduleBtn = document.getElementById('reschedule-btn');
+        
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'status-message status-info';
+        statusDiv.innerHTML = '<span class="spinner" style="display: inline-block; margin-right: 0.5rem;"></span> Rescheduling jobs...';
+        rescheduleBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/scheduler/reschedule', {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                statusDiv.className = 'status-message status-success';
+                statusDiv.innerHTML = `✓ ${data.message}. Total jobs: ${data.total_jobs_scheduled}`;
+                
+                // Refresh the scheduler status after a short delay
+                setTimeout(() => {
+                    loadSchedulerStatus();
+                    // Hide the status message after 5 seconds
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 5000);
+                }, 500);
+            } else {
+                statusDiv.className = 'status-message status-error';
+                statusDiv.innerHTML = `✕ Failed to reschedule: ${data.error || 'Unknown error'}`;
+            }
+        } catch (error) {
+            console.error('Error rescheduling jobs:', error);
+            statusDiv.className = 'status-message status-error';
+            statusDiv.innerHTML = '✕ Failed to reschedule jobs. Please try again.';
+        } finally {
+            rescheduleBtn.disabled = false;
         }
     }
     

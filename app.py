@@ -515,6 +515,11 @@ def fetch_credentials_for_environment(env_id, source=None):
 def schedule_environment_sync(environment):
     """Schedule periodic credential sync for an environment (separate schedules for installer and manager)"""
     
+    # Ensure scheduler is running
+    if not scheduler.running:
+        app.logger.warning(f"Scheduler not running when scheduling jobs for {environment.name}, starting it now")
+        scheduler.start()
+    
     # Schedule installer sync
     installer_job_id = f"env_sync_{environment.id}_installer"
     existing_installer_job = scheduler.get_job(installer_job_id)
@@ -692,9 +697,27 @@ def init_database():
             
             # Schedule all environments with sync enabled (either installer or manager)
             environments = Environment.query.all()
+            app.logger.info(f"Found {len(environments)} environment(s) in database")
+            
             for env in environments:
+                app.logger.info(f"Environment '{env.name}' (id={env.id}): "
+                              f"installer_sync_enabled={env.installer_sync_enabled}, "
+                              f"installer_host={env.installer_host}, "
+                              f"installer_sync_interval={env.installer_sync_interval_minutes}, "
+                              f"manager_sync_enabled={env.manager_sync_enabled}, "
+                              f"manager_host={env.manager_host}, "
+                              f"manager_sync_interval={env.manager_sync_interval_minutes}")
+                
+                # Check if scheduler is running before scheduling
+                if not scheduler.running:
+                    app.logger.warning("Scheduler is not running! Starting scheduler...")
+                    scheduler.start()
+                
                 if env.installer_sync_enabled or env.manager_sync_enabled:
+                    app.logger.info(f"Scheduling sync jobs for environment '{env.name}'")
                     schedule_environment_sync(env)
+                else:
+                    app.logger.info(f"Sync not enabled for environment '{env.name}'")
             
             # Log all scheduled jobs for debugging
             all_jobs = scheduler.get_jobs()
@@ -705,7 +728,8 @@ def init_database():
                     app.logger.info(f"  - {job.id}: next run at {next_run}")
             else:
                 app.logger.info("No jobs scheduled in scheduler")
-                
+            
+            app.logger.info(f"Scheduler state: running={scheduler.running}, state={scheduler.state}")
             app.logger.info("Database initialization complete")
         except Exception as e:
             app.logger.error(f"Error initializing database: {e}", exc_info=True)
@@ -1440,6 +1464,45 @@ def api_scheduler_status():
         'current_time': now.strftime('%Y-%m-%d %H:%M:%S'),
         'jobs': jobs
     })
+
+
+@app.route('/api/scheduler/reschedule', methods=['POST'])
+@login_required
+@admin_required
+def api_scheduler_reschedule():
+    """Reschedule all environment sync jobs (admin only)"""
+    try:
+        # Ensure scheduler is running
+        if not scheduler.running:
+            app.logger.warning("Scheduler was not running, starting it now")
+            scheduler.start()
+        
+        environments = Environment.query.all()
+        scheduled_count = 0
+        
+        for env in environments:
+            app.logger.info(f"Rescheduling jobs for environment '{env.name}' (id={env.id})")
+            schedule_environment_sync(env)
+            
+            # Check if any jobs were actually scheduled
+            installer_job = scheduler.get_job(f"env_sync_{env.id}_installer")
+            manager_job = scheduler.get_job(f"env_sync_{env.id}_manager")
+            if installer_job or manager_job:
+                scheduled_count += 1
+        
+        all_jobs = scheduler.get_jobs()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Rescheduled jobs for {len(environments)} environment(s)',
+            'environments_processed': len(environments),
+            'environments_with_jobs': scheduled_count,
+            'total_jobs_scheduled': len(all_jobs),
+            'scheduler_running': scheduler.running
+        })
+    except Exception as e:
+        app.logger.error(f"Error rescheduling jobs: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/test-credentials', methods=['POST'])
