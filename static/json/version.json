@@ -1,9 +1,9 @@
 {
-  "version": "780e600",
+  "version": "256f266",
   "build_type": "development",
   "branch": "main",
-  "commit": "780e600ca7e51c58ef03302fa61074f593520d2a",
-  "commit_short": "780e600",
-  "build_date": "2026-02-13",
-  "build_timestamp": "2026-02-13T01:50:58Z"
+  "commit": "256f2667cd25d4c139e3e534ebeb672344c8f185",
+  "commit_short": "256f266",
+  "build_date": "2026-02-14",
+  "build_timestamp": "2026-02-14T00:02:08Z"
 }
