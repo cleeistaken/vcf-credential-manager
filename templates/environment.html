@@ -22,15 +22,15 @@
                 <span class="btn-icon">🔄</span> Sync Now
             </button>
             {% endif %}
-            <button class="btn btn-success-outline" onclick="exportCSV()">
+            <button class="btn btn-success" onclick="exportCSV()">
                 <span class="btn-icon">📄</span> Export CSV
             </button>
-            <button class="btn btn-success-outline" onclick="exportExcel()">
+            <button class="btn btn-success" onclick="exportExcel()">
                 <span class="btn-icon">📊</span> Export Excel
             </button>
             {% if current_user.role == 'admin' or current_user.is_admin %}
             <div class="btn-group-overflow">
-                <button class="btn btn-outline" onclick="toggleExportConfigDropdown()" id="config-dropdown-btn">
+                <button class="btn btn-primary" onclick="toggleExportConfigDropdown()" id="config-dropdown-btn">
                     <span class="btn-icon">⚙️</span> Export Config <span class="caret">▾</span>
                 </button>
                 <div id="export-config-dropdown" class="dropdown-menu">
@@ -438,6 +438,18 @@
     
     .btn-outline:hover {
         background-color: #e8f4f8;
+    }
+    
+    /* Success Button (solid) */
+    .btn-success {
+        background-color: #60b515;
+        border-color: #60b515;
+        color: #ffffff;
+    }
+    
+    .btn-success:hover {
+        background-color: #4d9112;
+        border-color: #4d9112;
     }
     
     /* Success Outline Button */

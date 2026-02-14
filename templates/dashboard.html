@@ -15,7 +15,7 @@
             <button class="btn btn-primary" onclick="openAddEnvironmentModal()">
                 <span class="btn-icon">+</span> Add Environment
             </button>
-            <button class="btn btn-outline" onclick="openImportModal()">
+            <button class="btn btn-primary" onclick="openImportModal()">
                 <span class="btn-icon">↑</span> Import from File
             </button>
             {% endif %}
@@ -109,7 +109,7 @@
                 </button>
                 {% if current_user.role != 'readonly' %}
                 <div class="btn-group-overflow">
-                    <button class="btn btn-outline btn-sm" onclick="toggleEnvActions({{ env.id }})">
+                    <button class="btn btn-primary btn-sm" onclick="toggleEnvActions({{ env.id }})">
                         Actions <span class="caret">▾</span>
                     </button>
                     <div class="dropdown-menu" id="env-actions-{{ env.id }}">
@@ -147,12 +147,12 @@
 
 <!-- Add/Edit Environment Modal -->
 <div class="modal" id="env-modal">
-    <div class="modal-backdrop" onclick="closeEnvironmentModal()"></div>
+    <div class="modal-backdrop" onclick="handleBackdropClick(event)"></div>
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title" id="modal-title">Add Environment</h3>
-                <button class="close" onclick="closeEnvironmentModal()" aria-label="Close">
+                <button class="close" onclick="closeEnvironmentModal(true)" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -269,7 +269,7 @@
                     Test Connection
                 </button>
                 <div class="modal-footer-right">
-                    <button class="btn btn-outline" type="button" onclick="closeEnvironmentModal()">Cancel</button>
+                    <button class="btn btn-outline" type="button" onclick="closeEnvironmentModal(true)">Cancel</button>
                     <button class="btn btn-primary" type="button" onclick="saveEnvironment()">Save</button>
                 </div>
             </div>

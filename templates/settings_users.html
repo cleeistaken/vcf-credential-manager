@@ -120,7 +120,7 @@
                         <td class="text-muted">{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
                         <td>
                             {% if user.id != current_user.id %}
-                            <button class="btn btn-danger-outline btn-sm" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                            <button class="btn btn-danger btn-sm" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
                                 Delete
                             </button>
                             {% else %}
@@ -217,6 +217,17 @@
     .btn-primary:hover {
         background-color: #005a82;
         border-color: #005a82;
+    }
+    
+    .btn-danger {
+        background-color: #c92100;
+        border-color: #c92100;
+        color: #ffffff;
+    }
+    
+    .btn-danger:hover {
+        background-color: #a51c00;
+        border-color: #a51c00;
     }
     
     .btn-danger-outline {

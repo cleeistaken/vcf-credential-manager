@@ -28,6 +28,9 @@ async function loadCredentialCounts() {
     }
 }
 
+// Track initial form state to detect changes
+let initialFormState = null;
+
 function openAddEnvironmentModal() {
     editingEnvironmentId = null;
     document.getElementById('modal-title').textContent = 'Add Environment';
@@ -38,11 +41,51 @@ function openAddEnvironmentModal() {
     document.getElementById('installer-toggle').checked = false;
     document.getElementById('installer-section').style.display = 'none';
     document.getElementById('env-modal').classList.add('show');
+    
+    // Store initial form state after a brief delay to ensure form is reset
+    setTimeout(() => {
+        initialFormState = getFormState();
+    }, 50);
 }
 
-function closeEnvironmentModal() {
+function getFormState() {
+    const form = document.getElementById('environmentForm');
+    const formData = new FormData(form);
+    const state = {};
+    for (const [key, value] of formData.entries()) {
+        state[key] = value;
+    }
+    // Include checkbox states
+    state['installer-ssl-verify'] = document.getElementById('installer-ssl-verify').checked;
+    state['manager-ssl-verify'] = document.getElementById('manager-ssl-verify').checked;
+    state['installer-toggle'] = document.getElementById('installer-toggle').checked;
+    state['installer-sync-enabled'] = document.getElementById('installer-sync-enabled').checked;
+    state['manager-sync-enabled'] = document.getElementById('manager-sync-enabled').checked;
+    return JSON.stringify(state);
+}
+
+function hasFormChanged() {
+    if (!initialFormState) return false;
+    const currentState = getFormState();
+    return currentState !== initialFormState;
+}
+
+function closeEnvironmentModal(forceClose = false) {
+    if (!forceClose && hasFormChanged()) {
+        if (!confirm('You have unsaved changes. Are you sure you want to close without saving?')) {
+            return;
+        }
+    }
     document.getElementById('env-modal').classList.remove('show');
     editingEnvironmentId = null;
+    initialFormState = null;
+}
+
+function handleBackdropClick(event) {
+    // Only close if clicking directly on the backdrop, not on modal content
+    if (event.target.classList.contains('modal-backdrop')) {
+        closeEnvironmentModal();
+    }
 }
 
 function toggleInstallerSection() {
@@ -81,6 +124,11 @@ async function editEnvironment(envId) {
         document.getElementById('installer-section').style.display = hasInstallerData ? 'block' : 'none';
         
         document.getElementById('env-modal').classList.add('show');
+        
+        // Store initial form state after populating
+        setTimeout(() => {
+            initialFormState = getFormState();
+        }, 50);
     } catch (error) {
         console.error('Error loading environment:', error);
         alert('Failed to load environment details');
