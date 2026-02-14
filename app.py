@@ -245,6 +245,251 @@ def check_readonly():
     return None
 
 
+# =============================================================================
+# Input Validation Functions
+# =============================================================================
+
+import re
+
+# Username validation constants
+USERNAME_MIN_LENGTH = 3
+USERNAME_MAX_LENGTH = 50
+USERNAME_PATTERN = re.compile(r'^[a-zA-Z][a-zA-Z0-9._-]*$')
+
+# Environment name validation constants
+ENV_NAME_MIN_LENGTH = 1
+ENV_NAME_MAX_LENGTH = 100
+ENV_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9 ._-]*$')
+
+# Description validation constants
+DESCRIPTION_MAX_LENGTH = 500
+
+# Hostname validation constants
+HOSTNAME_MAX_LENGTH = 255
+HOSTNAME_PATTERN = re.compile(
+    r'^(?=.{1,255}$)'  # Total length check
+    r'(?!-)'  # Cannot start with hyphen
+    r'[a-zA-Z0-9]'  # Must start with alphanumeric
+    r'(?:[a-zA-Z0-9-]*[a-zA-Z0-9])?'  # Middle can have hyphens
+    r'(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*$'  # Domain parts
+)
+# Also allow IP addresses
+IP_PATTERN = re.compile(
+    r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}'
+    r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+)
+
+
+def validate_username(username):
+    """
+    Validate username format.
+    
+    Rules:
+    - Length: 3-50 characters
+    - Must start with a letter
+    - Can contain: letters, numbers, dots, underscores, hyphens
+    - Cannot contain spaces or special characters like ;!@#$%^&*()
+    
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not username:
+        return False, "Username is required"
+    
+    username = username.strip()
+    
+    if len(username) < USERNAME_MIN_LENGTH:
+        return False, f"Username must be at least {USERNAME_MIN_LENGTH} characters long"
+    
+    if len(username) > USERNAME_MAX_LENGTH:
+        return False, f"Username cannot exceed {USERNAME_MAX_LENGTH} characters"
+    
+    if not USERNAME_PATTERN.match(username):
+        return False, "Username must start with a letter and can only contain letters, numbers, dots, underscores, and hyphens"
+    
+    # Check for reserved usernames
+    reserved_names = ['admin', 'root', 'system', 'administrator', 'guest', 'test', 'null', 'undefined']
+    # Note: 'admin' is allowed as it's the default user, but we prevent creating duplicates elsewhere
+    
+    return True, None
+
+
+def validate_environment_name(name):
+    """
+    Validate environment name format.
+    
+    Rules:
+    - Length: 1-100 characters
+    - Must start with a letter or number
+    - Can contain: letters, numbers, spaces, dots, underscores, hyphens
+    - Cannot contain special characters like ;!@#$%^&*()<>
+    
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not name:
+        return False, "Environment name is required"
+    
+    name = name.strip()
+    
+    if len(name) < ENV_NAME_MIN_LENGTH:
+        return False, f"Environment name must be at least {ENV_NAME_MIN_LENGTH} character long"
+    
+    if len(name) > ENV_NAME_MAX_LENGTH:
+        return False, f"Environment name cannot exceed {ENV_NAME_MAX_LENGTH} characters"
+    
+    if not ENV_NAME_PATTERN.match(name):
+        return False, "Environment name must start with a letter or number and can only contain letters, numbers, spaces, dots, underscores, and hyphens"
+    
+    return True, None
+
+
+def validate_description(description):
+    """
+    Validate description field.
+    
+    Rules:
+    - Optional field (can be empty)
+    - Maximum length: 500 characters
+    - No dangerous characters that could cause issues
+    
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not description:
+        return True, None
+    
+    if len(description) > DESCRIPTION_MAX_LENGTH:
+        return False, f"Description cannot exceed {DESCRIPTION_MAX_LENGTH} characters"
+    
+    # Check for potentially dangerous patterns (script tags, etc.)
+    dangerous_patterns = ['<script', 'javascript:', 'onerror=', 'onload=']
+    description_lower = description.lower()
+    for pattern in dangerous_patterns:
+        if pattern in description_lower:
+            return False, "Description contains invalid content"
+    
+    return True, None
+
+
+def validate_hostname(hostname):
+    """
+    Validate hostname or IP address format.
+    
+    Rules:
+    - Can be a valid hostname (FQDN) or IP address
+    - Maximum length: 255 characters
+    - Must follow DNS naming conventions or be a valid IPv4 address
+    
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not hostname:
+        return True, None  # Hostname is optional
+    
+    hostname = hostname.strip()
+    
+    if len(hostname) > HOSTNAME_MAX_LENGTH:
+        return False, f"Hostname cannot exceed {HOSTNAME_MAX_LENGTH} characters"
+    
+    # Check if it's a valid IP address
+    if IP_PATTERN.match(hostname):
+        return True, None
+    
+    # Check if it's a valid hostname
+    if HOSTNAME_PATTERN.match(hostname):
+        return True, None
+    
+    return False, "Invalid hostname or IP address format"
+
+
+def validate_vcf_username(username):
+    """
+    Validate VCF API username format.
+    
+    Rules:
+    - Can contain: letters, numbers, @, dots, underscores, hyphens, backslash (for domain users)
+    - Maximum length: 100 characters
+    - More permissive than local usernames to support domain accounts (e.g., DOMAIN\\user, user@domain.com)
+    
+    Returns:
+        tuple: (is_valid: bool, error_message: str or None)
+    """
+    if not username:
+        return True, None  # Username is optional (depends on whether host is configured)
+    
+    username = username.strip()
+    
+    if len(username) > 100:
+        return False, "VCF username cannot exceed 100 characters"
+    
+    # Allow domain-style usernames: user@domain.com, DOMAIN\user, simple usernames
+    vcf_username_pattern = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9@._\\-]*$')
+    if not vcf_username_pattern.match(username):
+        return False, "VCF username contains invalid characters"
+    
+    return True, None
+
+
+def validate_environment_data(data, is_update=False):
+    """
+    Validate all environment data fields.
+    
+    Args:
+        data: Dictionary containing environment data
+        is_update: If True, name validation is optional (for updates that don't change name)
+    
+    Returns:
+        tuple: (is_valid: bool, errors: list of error messages)
+    """
+    errors = []
+    
+    # Validate name (required for new environments)
+    if not is_update or 'name' in data:
+        is_valid, error = validate_environment_name(data.get('name'))
+        if not is_valid:
+            errors.append(error)
+    
+    # Validate description
+    is_valid, error = validate_description(data.get('description'))
+    if not is_valid:
+        errors.append(error)
+    
+    # Validate installer fields
+    is_valid, error = validate_hostname(data.get('installer_host'))
+    if not is_valid:
+        errors.append(f"Installer host: {error}")
+    
+    is_valid, error = validate_vcf_username(data.get('installer_username'))
+    if not is_valid:
+        errors.append(f"Installer username: {error}")
+    
+    # Validate manager fields
+    is_valid, error = validate_hostname(data.get('manager_host'))
+    if not is_valid:
+        errors.append(f"Manager host: {error}")
+    
+    is_valid, error = validate_vcf_username(data.get('manager_username'))
+    if not is_valid:
+        errors.append(f"Manager username: {error}")
+    
+    # Validate sync intervals
+    for field in ['installer_sync_interval_minutes', 'manager_sync_interval_minutes', 'sync_interval_minutes']:
+        if field in data and data[field] is not None:
+            try:
+                interval = int(data[field])
+                if interval < 0:
+                    errors.append(f"{field} cannot be negative")
+                elif interval > 0 and interval < 5:
+                    errors.append(f"{field} must be at least 5 minutes (or 0 to disable)")
+                elif interval > 1440:  # 24 hours
+                    errors.append(f"{field} cannot exceed 1440 minutes (24 hours)")
+            except (ValueError, TypeError):
+                errors.append(f"{field} must be a valid number")
+    
+    return len(errors) == 0, errors
+
+
 def _get_friendly_error_message(exception):
     """Extract a friendly error message from an exception without full traceback"""
     if isinstance(exception, requests.exceptions.Timeout):
@@ -875,12 +1120,18 @@ def settings_scheduler():
 def add_user():
     """Add a new user"""
     try:
-        username = request.form.get('username')
+        username = request.form.get('username', '').strip()
         password = request.form.get('password')
         role = request.form.get('role', 'readonly')
         
         if not username or not password:
             flash('Username and password are required', 'error')
+            return redirect(url_for('settings_users'))
+        
+        # Validate username format
+        is_valid, error_msg = validate_username(username)
+        if not is_valid:
+            flash(error_msg, 'error')
             return redirect(url_for('settings_users'))
         
         # Check if user already exists
@@ -891,6 +1142,15 @@ def add_user():
         # Validate password length
         if len(password) < 8:
             flash('Password must be at least 8 characters long', 'error')
+            return redirect(url_for('settings_users'))
+        
+        if len(password) > 128:
+            flash('Password cannot exceed 128 characters', 'error')
+            return redirect(url_for('settings_users'))
+        
+        # Validate role
+        if role not in ['admin', 'readonly']:
+            flash('Invalid role specified', 'error')
             return redirect(url_for('settings_users'))
         
         # Create new user
@@ -1091,17 +1351,26 @@ def api_environments():
         
         data = request.json
         
+        # Validate environment data
+        is_valid, errors = validate_environment_data(data, is_update=False)
+        if not is_valid:
+            return jsonify({'error': 'Validation failed', 'details': errors}), 400
+        
+        # Check if environment name already exists
+        if Environment.query.filter_by(name=data['name'].strip()).first():
+            return jsonify({'error': f'Environment with name "{data["name"]}" already exists'}), 400
+        
         app.logger.info(f"Creating new environment: {data.get('name')}")
         
         environment = Environment(
-            name=data['name'],
-            description=data.get('description', ''),
-            installer_host=data.get('installer_host'),
-            installer_username=data.get('installer_username'),
+            name=data['name'].strip(),
+            description=data.get('description', '').strip() if data.get('description') else '',
+            installer_host=data.get('installer_host', '').strip() if data.get('installer_host') else None,
+            installer_username=data.get('installer_username', '').strip() if data.get('installer_username') else None,
             installer_password=data.get('installer_password'),
             installer_ssl_verify=data.get('installer_ssl_verify', True),
-            manager_host=data.get('manager_host'),
-            manager_username=data.get('manager_username'),
+            manager_host=data.get('manager_host', '').strip() if data.get('manager_host') else None,
+            manager_username=data.get('manager_username', '').strip() if data.get('manager_username') else None,
             manager_password=data.get('manager_password'),
             manager_ssl_verify=data.get('manager_ssl_verify', True),
             ssl_verify=data.get('ssl_verify', True),  # Legacy
@@ -1174,12 +1443,12 @@ def api_import_environment():
         if not isinstance(data, dict):
             return jsonify({'success': False, 'errors': ['File must contain a single environment object']}), 400
         
-        # Validate required fields
-        errors = []
+        # Validate environment data using common validation
+        is_valid, validation_errors = validate_environment_data(data, is_update=False)
+        errors = list(validation_errors) if validation_errors else []
         
-        if not data.get('name'):
-            errors.append('Missing required field: name')
-        elif Environment.query.filter_by(name=data['name']).first():
+        # Check if environment name already exists
+        if data.get('name') and Environment.query.filter_by(name=data['name'].strip()).first():
             errors.append(f'Environment with name "{data["name"]}" already exists')
         
         has_installer = data.get('installer_host') and data.get('installer_username') and data.get('installer_password')
@@ -1187,15 +1456,6 @@ def api_import_environment():
         
         if not has_installer and not has_manager:
             errors.append('At least one complete configuration required (installer or manager with host, username, and password)')
-        
-        # Validate field types
-        if data.get('sync_interval_minutes') is not None:
-            try:
-                interval = int(data['sync_interval_minutes'])
-                if interval < 5:
-                    errors.append('sync_interval_minutes must be at least 5')
-            except (ValueError, TypeError):
-                errors.append('sync_interval_minutes must be a number')
         
         if errors:
             return jsonify({'success': False, 'errors': errors}), 400
@@ -1252,16 +1512,16 @@ def api_import_environment():
                 'connection_tests': connection_tests
             }), 400
         
-        # Create environment
+        # Create environment with sanitized values
         environment = Environment(
-            name=data['name'],
-            description=data.get('description', ''),
-            installer_host=data.get('installer_host'),
-            installer_username=data.get('installer_username'),
+            name=data['name'].strip(),
+            description=data.get('description', '').strip() if data.get('description') else '',
+            installer_host=data.get('installer_host', '').strip() if data.get('installer_host') else None,
+            installer_username=data.get('installer_username', '').strip() if data.get('installer_username') else None,
             installer_password=data.get('installer_password'),
             installer_ssl_verify=data.get('installer_ssl_verify', True),
-            manager_host=data.get('manager_host'),
-            manager_username=data.get('manager_username'),
+            manager_host=data.get('manager_host', '').strip() if data.get('manager_host') else None,
+            manager_username=data.get('manager_username', '').strip() if data.get('manager_username') else None,
             manager_password=data.get('manager_password'),
             manager_ssl_verify=data.get('manager_ssl_verify', True),
             sync_enabled=data.get('sync_enabled', False),
@@ -1328,19 +1588,40 @@ def api_environment(env_id):
         
         data = request.json
         
-        environment.name = data.get('name', environment.name)
-        environment.description = data.get('description', environment.description)
-        environment.installer_host = data.get('installer_host', environment.installer_host)
-        environment.installer_username = data.get('installer_username', environment.installer_username)
+        # Validate environment data (is_update=True makes name optional)
+        is_valid, errors = validate_environment_data(data, is_update=True)
+        if not is_valid:
+            return jsonify({'error': 'Validation failed', 'details': errors}), 400
+        
+        # Check if new name conflicts with existing environment (if name is being changed)
+        if 'name' in data and data['name'].strip() != environment.name:
+            existing = Environment.query.filter_by(name=data['name'].strip()).first()
+            if existing and existing.id != environment.id:
+                return jsonify({'error': f'Environment with name "{data["name"]}" already exists'}), 400
+        
+        # Update fields with sanitized values
+        if 'name' in data:
+            environment.name = data['name'].strip()
+        if 'description' in data:
+            environment.description = data['description'].strip() if data['description'] else ''
+        if 'installer_host' in data:
+            environment.installer_host = data['installer_host'].strip() if data['installer_host'] else None
+        if 'installer_username' in data:
+            environment.installer_username = data['installer_username'].strip() if data['installer_username'] else None
         if data.get('installer_password'):
             environment.installer_password = data['installer_password']
-        environment.installer_ssl_verify = data.get('installer_ssl_verify', environment.installer_ssl_verify)
-        environment.manager_host = data.get('manager_host', environment.manager_host)
-        environment.manager_username = data.get('manager_username', environment.manager_username)
+        if 'installer_ssl_verify' in data:
+            environment.installer_ssl_verify = data['installer_ssl_verify']
+        if 'manager_host' in data:
+            environment.manager_host = data['manager_host'].strip() if data['manager_host'] else None
+        if 'manager_username' in data:
+            environment.manager_username = data['manager_username'].strip() if data['manager_username'] else None
         if data.get('manager_password'):
             environment.manager_password = data['manager_password']
-        environment.manager_ssl_verify = data.get('manager_ssl_verify', environment.manager_ssl_verify)
-        environment.ssl_verify = data.get('ssl_verify', environment.ssl_verify)  # Legacy
+        if 'manager_ssl_verify' in data:
+            environment.manager_ssl_verify = data['manager_ssl_verify']
+        if 'ssl_verify' in data:
+            environment.ssl_verify = data['ssl_verify']  # Legacy
         # Separate sync settings
         if 'installer_sync_enabled' in data:
             environment.installer_sync_enabled = data['installer_sync_enabled']
@@ -1351,8 +1632,10 @@ def api_environment(env_id):
         if 'manager_sync_interval_minutes' in data:
             environment.manager_sync_interval_minutes = data['manager_sync_interval_minutes']
         # Legacy fields
-        environment.sync_enabled = data.get('sync_enabled', environment.sync_enabled)
-        environment.sync_interval_minutes = data.get('sync_interval_minutes', environment.sync_interval_minutes)
+        if 'sync_enabled' in data:
+            environment.sync_enabled = data['sync_enabled']
+        if 'sync_interval_minutes' in data:
+            environment.sync_interval_minutes = data['sync_interval_minutes']
         
         db.session.commit()
         

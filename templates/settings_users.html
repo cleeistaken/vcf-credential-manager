@@ -21,17 +21,41 @@
             <h3 class="card-title">Add New User</h3>
         </div>
         <div class="card-block">
-            <form method="POST" action="{{ url_for('add_user') }}" class="user-form" id="add-user-form">
+            <!-- Validation Requirements Box -->
+            <div class="validation-requirements">
+                <div class="validation-requirements-title">Input Requirements</div>
+                <div class="validation-requirements-content">
+                    <div class="validation-requirement">
+                        <span class="validation-label">Username:</span>
+                        <span class="validation-text">3-50 characters. Must start with a letter. Allowed: letters, numbers, <code>.</code> <code>_</code> <code>-</code></span>
+                    </div>
+                    <div class="validation-requirement">
+                        <span class="validation-label">Password:</span>
+                        <span class="validation-text">8-128 characters. Any characters allowed.</span>
+                    </div>
+                </div>
+            </div>
+            
+            <form method="POST" action="{{ url_for('add_user') }}" class="user-form" id="add-user-form" onsubmit="return validateUserForm()">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="username" class="clr-required-mark">Username</label>
-                        <input type="text" id="username" name="username" class="clr-input" required placeholder="Enter username">
+                        <input type="text" id="username" name="username" class="clr-input" required 
+                               placeholder="Enter username"
+                               minlength="3" maxlength="50"
+                               pattern="^[a-zA-Z][a-zA-Z0-9._-]*$"
+                               title="Username must start with a letter and can only contain letters, numbers, dots, underscores, and hyphens"
+                               oninput="validateUsername()">
+                        <span class="form-error" id="username-error" style="display: none;"></span>
                     </div>
                     
                     <div class="form-group">
                         <label for="password" class="clr-required-mark">Password</label>
-                        <input type="password" id="password" name="password" class="clr-input" required minlength="8" placeholder="Minimum 8 characters">
-                        <span class="form-hint">Minimum 8 characters required</span>
+                        <input type="password" id="password" name="password" class="clr-input" required 
+                               minlength="8" maxlength="128" 
+                               placeholder="Enter password"
+                               oninput="validatePassword()">
+                        <span class="form-error" id="password-error" style="display: none;"></span>
                     </div>
                     
                     <div class="form-group">
@@ -394,11 +418,168 @@
     .text-muted {
         color: #666;
     }
+    
+    /* Validation Requirements Box */
+    .validation-requirements {
+        background: #f5f8fa;
+        border: 1px solid #e0e6eb;
+        border-left: 3px solid #0072a3;
+        border-radius: 3px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
+        font-size: 0.8rem;
+    }
+    
+    .validation-requirements-title {
+        font-weight: 600;
+        color: #313131;
+        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    
+    .validation-requirements-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    
+    .validation-requirement {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        color: #555;
+        line-height: 1.4;
+    }
+    
+    .validation-label {
+        font-weight: 500;
+        color: #313131;
+        min-width: 70px;
+        flex-shrink: 0;
+    }
+    
+    .validation-text {
+        color: #666;
+    }
+    
+    .validation-text code {
+        background: #e8e8e8;
+        padding: 0.1rem 0.3rem;
+        border-radius: 2px;
+        font-family: monospace;
+        font-size: 0.85em;
+        color: #313131;
+    }
+    
+    /* Form Validation Styles */
+    .form-error {
+        color: #c92100;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+    
+    .clr-input.invalid {
+        border-color: #c92100;
+    }
+    
+    .clr-input.valid {
+        border-color: #60b515;
+    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // Username validation regex (must match server-side)
+    const USERNAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9._-]*$/;
+    const USERNAME_MIN = 3;
+    const USERNAME_MAX = 50;
+    
+    function validateUsername() {
+        const input = document.getElementById('username');
+        const error = document.getElementById('username-error');
+        const value = input.value.trim();
+        
+        let errorMsg = '';
+        
+        if (value.length === 0) {
+            // Empty - reset state
+            input.classList.remove('invalid', 'valid');
+            error.style.display = 'none';
+            return true;
+        }
+        
+        if (value.length < USERNAME_MIN) {
+            errorMsg = `Username must be at least ${USERNAME_MIN} characters`;
+        } else if (value.length > USERNAME_MAX) {
+            errorMsg = `Username cannot exceed ${USERNAME_MAX} characters`;
+        } else if (!USERNAME_PATTERN.test(value)) {
+            if (!/^[a-zA-Z]/.test(value)) {
+                errorMsg = 'Username must start with a letter';
+            } else {
+                errorMsg = 'Username can only contain letters, numbers, dots, underscores, and hyphens';
+            }
+        }
+        
+        if (errorMsg) {
+            input.classList.add('invalid');
+            input.classList.remove('valid');
+            error.textContent = errorMsg;
+            error.style.display = 'block';
+            return false;
+        } else {
+            input.classList.add('valid');
+            input.classList.remove('invalid');
+            error.style.display = 'none';
+            return true;
+        }
+    }
+    
+    function validatePassword() {
+        const input = document.getElementById('password');
+        const error = document.getElementById('password-error');
+        const value = input.value;
+        
+        let errorMsg = '';
+        
+        if (value.length === 0) {
+            input.classList.remove('invalid', 'valid');
+            error.style.display = 'none';
+            return true;
+        }
+        
+        if (value.length < 8) {
+            errorMsg = 'Password must be at least 8 characters';
+        } else if (value.length > 128) {
+            errorMsg = 'Password cannot exceed 128 characters';
+        }
+        
+        if (errorMsg) {
+            input.classList.add('invalid');
+            input.classList.remove('valid');
+            error.textContent = errorMsg;
+            error.style.display = 'block';
+            return false;
+        } else {
+            input.classList.add('valid');
+            input.classList.remove('invalid');
+            error.style.display = 'none';
+            return true;
+        }
+    }
+    
+    function validateUserForm() {
+        const usernameValid = validateUsername();
+        const passwordValid = validatePassword();
+        
+        if (!usernameValid || !passwordValid) {
+            return false;
+        }
+        return true;
+    }
+    
     async function deleteUser(userId, username) {
         if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis action cannot be undone.`)) {
             return;

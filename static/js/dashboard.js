@@ -87,6 +87,83 @@ async function editEnvironment(envId) {
     }
 }
 
+// Input validation patterns (must match server-side)
+const ENV_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9 ._-]*$/;
+const ENV_NAME_MAX = 100;
+const DESCRIPTION_MAX = 500;
+const HOSTNAME_PATTERN = /^(?=.{1,255}$)(?!-)[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+const IP_PATTERN = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+const VCF_USERNAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9@._\\-]*$/;
+
+function validateEnvironmentName(name) {
+    if (!name || name.trim().length === 0) {
+        return 'Environment name is required';
+    }
+    name = name.trim();
+    if (name.length > ENV_NAME_MAX) {
+        return `Environment name cannot exceed ${ENV_NAME_MAX} characters`;
+    }
+    if (!ENV_NAME_PATTERN.test(name)) {
+        return 'Environment name must start with a letter or number and can only contain letters, numbers, spaces, dots, underscores, and hyphens';
+    }
+    return null;
+}
+
+function validateDescription(description) {
+    if (description && description.length > DESCRIPTION_MAX) {
+        return `Description cannot exceed ${DESCRIPTION_MAX} characters`;
+    }
+    return null;
+}
+
+function validateHostname(hostname, fieldName) {
+    if (!hostname || hostname.trim().length === 0) {
+        return null; // Optional field
+    }
+    hostname = hostname.trim();
+    if (hostname.length > 255) {
+        return `${fieldName} cannot exceed 255 characters`;
+    }
+    if (!HOSTNAME_PATTERN.test(hostname) && !IP_PATTERN.test(hostname)) {
+        return `${fieldName} must be a valid hostname or IP address`;
+    }
+    return null;
+}
+
+function validateVcfUsername(username, fieldName) {
+    if (!username || username.trim().length === 0) {
+        return null; // Optional field
+    }
+    username = username.trim();
+    if (username.length > 100) {
+        return `${fieldName} cannot exceed 100 characters`;
+    }
+    if (!VCF_USERNAME_PATTERN.test(username)) {
+        return `${fieldName} contains invalid characters`;
+    }
+    return null;
+}
+
+function validateSyncInterval(interval, fieldName) {
+    if (interval === null || interval === undefined || interval === '') {
+        return null;
+    }
+    const num = parseInt(interval);
+    if (isNaN(num)) {
+        return `${fieldName} must be a valid number`;
+    }
+    if (num < 0) {
+        return `${fieldName} cannot be negative`;
+    }
+    if (num > 0 && num < 5) {
+        return `${fieldName} must be at least 5 minutes (or 0 to disable)`;
+    }
+    if (num > 1440) {
+        return `${fieldName} cannot exceed 1440 minutes (24 hours)`;
+    }
+    return null;
+}
+
 async function saveEnvironment() {
     const form = document.getElementById('environmentForm');
     const formData = new FormData(form);
@@ -110,14 +187,45 @@ async function saveEnvironment() {
         ssl_verify: true  // Legacy field
     };
     
-    // Validate
-    if (!data.name) {
-        alert('Environment name is required');
-        return;
+    // Client-side validation
+    const errors = [];
+    
+    // Validate environment name
+    let error = validateEnvironmentName(data.name);
+    if (error) errors.push(error);
+    
+    // Validate description
+    error = validateDescription(data.description);
+    if (error) errors.push(error);
+    
+    // Validate hostnames
+    error = validateHostname(data.installer_host, 'Installer Host');
+    if (error) errors.push(error);
+    
+    error = validateHostname(data.manager_host, 'Manager Host');
+    if (error) errors.push(error);
+    
+    // Validate usernames
+    error = validateVcfUsername(data.installer_username, 'Installer Username');
+    if (error) errors.push(error);
+    
+    error = validateVcfUsername(data.manager_username, 'Manager Username');
+    if (error) errors.push(error);
+    
+    // Validate sync intervals
+    error = validateSyncInterval(data.installer_sync_interval_minutes, 'Installer Sync Interval');
+    if (error) errors.push(error);
+    
+    error = validateSyncInterval(data.manager_sync_interval_minutes, 'Manager Sync Interval');
+    if (error) errors.push(error);
+    
+    // Check that at least one host is specified
+    if (!data.installer_host && !data.manager_host) {
+        errors.push('At least one of Installer Host or Manager Host must be specified');
     }
     
-    if (!data.installer_host && !data.manager_host) {
-        alert('At least one of Installer Host or Manager Host must be specified');
+    if (errors.length > 0) {
+        alert('Validation Error:\n\n' + errors.join('\n'));
         return;
     }
     
@@ -147,8 +255,15 @@ async function saveEnvironment() {
             closeEnvironmentModal();
             location.reload();
         } else {
-            const error = await response.json();
-            alert(`Failed to save environment: ${error.error || 'Unknown error'}`);
+            const errorData = await response.json();
+            let errorMsg = errorData.error || 'Unknown error';
+            
+            // If there are validation details, show them
+            if (errorData.details && Array.isArray(errorData.details)) {
+                errorMsg += '\n\n' + errorData.details.join('\n');
+            }
+            
+            alert(`Failed to save environment: ${errorMsg}`);
         }
     } catch (error) {
         console.error('Error saving environment:', error);
