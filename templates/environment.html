@@ -234,7 +234,7 @@
 
 <!-- Copy Notification -->
 <div id="copy-notification" class="alert alert-success notification-toast">
-    <span class="alert-icon">✓</span> Copied to clipboard!
+    <span class="alert-icon">✓</span> <span class="notification-text">Copied to clipboard!</span>
 </div>
 
 <!-- Password History Modal -->
@@ -255,9 +255,13 @@
                     <div class="info-row">
                         <span class="info-label">Current Password:</span> 
                         <span id="history-current-password" class="password-hidden"></span>
-                        <button class="btn btn-link btn-icon-only" onclick="toggleHistoryPassword('history-current-password')" title="Show/Hide">👁️</button>
                     </div>
                     <div class="info-row"><span class="info-label">Last Updated:</span> <span id="history-last-updated"></span></div>
+                    <div class="info-row history-actions">
+                        <button class="btn btn-action" id="history-current-toggle" onclick="toggleHistoryPassword('history-current-password', this)">Show</button>
+                        <button class="btn btn-action" id="history-copy-password" onclick="copyCurrentHistoryPassword()">Copy Password</button>
+                        <button class="btn btn-action" id="history-copy-credentials" onclick="copyCurrentHistoryCredentials()">Copy Credentials</button>
+                    </div>
                 </div>
                 
                 <h4>Previous Passwords</h4>
@@ -358,6 +362,48 @@
         min-width: auto;
         border: none;
         background: transparent;
+    }
+    
+    /* Action Button - Small text button for table actions */
+    .btn-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem 0.5rem;
+        height: auto;
+        min-height: 24px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: normal;
+        border-radius: 3px;
+        border: 1px solid #ccc;
+        background-color: #fff;
+        color: #313131;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+    
+    .btn-action:hover {
+        background-color: #f0f6f8;
+        border-color: #0072a3;
+        color: #0072a3;
+    }
+    
+    .btn-action:active {
+        background-color: #e0eef3;
+    }
+    
+    /* Action buttons container */
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    
+    .actions-cell {
+        min-width: 280px;
     }
     
     /* Primary Button - Clarity Blue */
@@ -1040,6 +1086,16 @@
         color: #666;
         margin-right: 0.5rem;
     }
+    
+    .history-actions {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e0e0e0;
+    }
+    
+    .history-actions .btn-action {
+        margin-right: 0.35rem;
+    }
 </style>
 {% endblock %}
 
@@ -1088,6 +1144,9 @@
             const tr = document.createElement('tr');
             const sourceLabel = cred.source === 'VCF_INSTALLER' ? 'Installer' : 'Manager';
             
+            // Store credential data for copy credentials function
+            const credDataAttr = `data-hostname="${escapeHtml(cred.hostname || '')}" data-username="${escapeHtml(cred.username || '')}" data-password="${escapeHtml(cred.password || '')}"`;
+            
             tr.innerHTML = `
                 <td>${escapeHtml(cred.hostname || '')}</td>
                 <td>${escapeHtml(cred.username || '')}</td>
@@ -1100,10 +1159,13 @@
                 <td>${escapeHtml(cred.domain_name || '')}</td>
                 <td>${sourceLabel}</td>
                 <td>${cred.last_updated ? new Date(cred.last_updated).toLocaleString() : ''}</td>
-                <td>
-                    <button class="btn btn-link btn-icon-only" onclick="togglePassword(${cred.id})" title="Show/Hide">👁️</button>
-                    <button class="btn btn-link btn-icon-only" onclick="copyPassword('${escapeHtml(cred.password)}')" title="Copy">📋</button>
-                    <button class="btn btn-link btn-sm" onclick="showHistory(${cred.id})">History</button>
+                <td class="actions-cell">
+                    <div class="action-buttons">
+                        <button class="btn btn-action" onclick="togglePassword(${cred.id}, this)">Show</button>
+                        <button class="btn btn-action" onclick="copyPassword('${escapeHtml(cred.password)}')">Copy Password</button>
+                        <button class="btn btn-action" onclick="copyCredentials('${escapeHtml(cred.hostname || '')}', '${escapeHtml(cred.username || '')}', '${escapeHtml(cred.password || '')}')">Copy Credentials</button>
+                        <button class="btn btn-action" onclick="showHistory(${cred.id})">History</button>
+                    </div>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -1139,16 +1201,35 @@
         });
     }
     
-    function togglePassword(credId) {
-        document.getElementById(`pwd-${credId}`).classList.toggle('password-hidden');
+    function togglePassword(credId, button) {
+        const pwdElement = document.getElementById(`pwd-${credId}`);
+        pwdElement.classList.toggle('password-hidden');
+        
+        // Update button text
+        if (button) {
+            const isHidden = pwdElement.classList.contains('password-hidden');
+            button.textContent = isHidden ? 'Show' : 'Hide';
+        }
     }
     
     function copyPassword(password) {
         navigator.clipboard.writeText(password).then(() => {
-            const notification = document.getElementById('copy-notification');
-            notification.style.display = 'flex';
-            setTimeout(() => notification.style.display = 'none', 2000);
+            showNotification('Password copied to clipboard');
         });
+    }
+    
+    function copyCredentials(hostname, username, password) {
+        const yaml = `hostname: ${hostname}\nusername: ${username}\npassword: ${password}`;
+        navigator.clipboard.writeText(yaml).then(() => {
+            showNotification('Credentials copied to clipboard (YAML format)');
+        });
+    }
+    
+    function showNotification(message) {
+        const notification = document.getElementById('copy-notification');
+        notification.querySelector('.notification-text').textContent = message;
+        notification.style.display = 'flex';
+        setTimeout(() => notification.style.display = 'none', 2000);
     }
     
     function applyFilters() {
@@ -1393,6 +1474,8 @@
     }
     
     // Password History Modal
+    let currentHistoryData = null;
+    
     async function showHistory(credId) {
         const modal = document.getElementById('history-modal');
         const loading = document.getElementById('history-loading');
@@ -1402,11 +1485,16 @@
         loading.style.display = 'block';
         content.style.display = 'none';
         
+        // Reset toggle button text
+        document.getElementById('history-current-toggle').textContent = 'Show';
+        document.getElementById('history-current-password').classList.add('password-hidden');
+        
         try {
             const response = await fetch(`/api/credentials/${credId}/history`);
             if (!response.ok) throw new Error('Failed to load history');
             
             const data = await response.json();
+            currentHistoryData = data.credential;
             
             document.getElementById('history-hostname').textContent = data.credential.hostname;
             document.getElementById('history-username').textContent = data.credential.username;
@@ -1420,15 +1508,22 @@
             if (data.history && data.history.length > 0) {
                 data.history.forEach((entry, index) => {
                     const tr = document.createElement('tr');
+                    const hostname = escapeHtml(data.credential.hostname || '');
+                    const username = escapeHtml(data.credential.username || '');
+                    const password = escapeHtml(entry.password || '');
+                    
                     tr.innerHTML = `
                         <td class="password-cell">
-                            <span class="password-hidden" id="hist-pwd-${index}">${escapeHtml(entry.password)}</span>
+                            <span class="password-hidden" id="hist-pwd-${index}">${password}</span>
                         </td>
                         <td>${entry.changed_at ? new Date(entry.changed_at).toLocaleString() : ''}</td>
                         <td>${entry.changed_by || 'SYSTEM'}</td>
-                        <td>
-                            <button class="btn btn-link btn-icon-only" onclick="toggleHistoryPassword('hist-pwd-${index}')" title="Show/Hide">👁️</button>
-                            <button class="btn btn-link btn-icon-only" onclick="copyPassword('${escapeHtml(entry.password)}')" title="Copy">📋</button>
+                        <td class="actions-cell">
+                            <div class="action-buttons">
+                                <button class="btn btn-action" onclick="toggleHistoryPassword('hist-pwd-${index}', this)">Show</button>
+                                <button class="btn btn-action" onclick="copyPassword('${password}')">Copy Password</button>
+                                <button class="btn btn-action" onclick="copyCredentials('${hostname}', '${username}', '${password}')">Copy Credentials</button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -1448,10 +1543,34 @@
     
     function closeHistoryModal() {
         document.getElementById('history-modal').style.display = 'none';
+        currentHistoryData = null;
     }
     
-    function toggleHistoryPassword(elementId) {
-        document.getElementById(elementId).classList.toggle('password-hidden');
+    function toggleHistoryPassword(elementId, button) {
+        const element = document.getElementById(elementId);
+        element.classList.toggle('password-hidden');
+        
+        // Update button text
+        if (button) {
+            const isHidden = element.classList.contains('password-hidden');
+            button.textContent = isHidden ? 'Show' : 'Hide';
+        }
+    }
+    
+    function copyCurrentHistoryPassword() {
+        if (currentHistoryData && currentHistoryData.current_password) {
+            copyPassword(currentHistoryData.current_password);
+        }
+    }
+    
+    function copyCurrentHistoryCredentials() {
+        if (currentHistoryData) {
+            copyCredentials(
+                currentHistoryData.hostname || '',
+                currentHistoryData.username || '',
+                currentHistoryData.current_password || ''
+            );
+        }
     }
     
     document.addEventListener('keydown', function(event) {
