@@ -861,6 +861,14 @@ def settings_server():
     return render_template('settings_server.html', python_version=python_version)
 
 
+@app.route('/settings/scheduler')
+@login_required
+@admin_required
+def settings_scheduler():
+    """Scheduled jobs management page - admin only"""
+    return render_template('settings_scheduler.html')
+
+
 @app.route('/settings/users/add', methods=['POST'])
 @login_required
 @admin_required
@@ -1430,13 +1438,18 @@ def api_sync_environment(env_id):
 @admin_required
 def api_scheduler_status():
     """Get scheduler status and list of scheduled jobs (admin only)"""
+    import re
     from datetime import datetime
+    
+    # Build a cache of environment names for quick lookup
+    environments = {env.id: env for env in Environment.query.all()}
     
     jobs = []
     now = datetime.now()
     for job in scheduler.get_jobs():
         next_run = job.next_run_time
         time_until = None
+        time_until_seconds = None
         if next_run:
             # Make both timezone-naive for comparison
             if next_run.tzinfo:
@@ -1444,18 +1457,60 @@ def api_scheduler_status():
             else:
                 next_run_naive = next_run
             delta = next_run_naive - now
-            time_until = f"{int(delta.total_seconds() / 60)} minutes" if delta.total_seconds() > 0 else "overdue"
+            time_until_seconds = int(delta.total_seconds())
+            if time_until_seconds > 0:
+                if time_until_seconds < 60:
+                    time_until = f"{time_until_seconds} seconds"
+                elif time_until_seconds < 3600:
+                    time_until = f"{int(time_until_seconds / 60)} minutes"
+                else:
+                    hours = int(time_until_seconds / 3600)
+                    minutes = int((time_until_seconds % 3600) / 60)
+                    time_until = f"{hours}h {minutes}m"
+            else:
+                time_until = "overdue"
+        
+        # Parse job ID to extract environment info
+        # Format: env_sync_{env_id}_{type} where type is 'installer' or 'manager'
+        environment_name = None
+        sync_type = None
+        environment_id = None
+        
+        match = re.match(r'env_sync_(\d+)_(\w+)', job.id)
+        if match:
+            environment_id = int(match.group(1))
+            sync_type = match.group(2)
+            env = environments.get(environment_id)
+            if env:
+                environment_name = env.name
+        
+        # Extract interval from trigger string (e.g., "interval[0:30:00]" -> 30 minutes)
+        interval_minutes = None
+        trigger_str = str(job.trigger)
+        interval_match = re.search(r'interval\[(\d+):(\d+):(\d+)\]', trigger_str)
+        if interval_match:
+            hours = int(interval_match.group(1))
+            minutes = int(interval_match.group(2))
+            interval_minutes = hours * 60 + minutes
         
         jobs.append({
             'id': job.id,
             'name': job.name,
+            'environment_name': environment_name,
+            'environment_id': environment_id,
+            'sync_type': sync_type,
+            'interval_minutes': interval_minutes,
             'next_run_time': next_run.isoformat() if next_run else None,
             'next_run_time_local': next_run.strftime('%Y-%m-%d %H:%M:%S') if next_run else None,
             'time_until_next_run': time_until,
-            'trigger': str(job.trigger),
+            'time_until_seconds': time_until_seconds,
+            'trigger': trigger_str,
             'func': str(job.func),
             'args': str(job.args)
         })
+    
+    # Sort jobs by environment name, then by sync type
+    jobs.sort(key=lambda x: (x['environment_name'] or '', x['sync_type'] or ''))
     
     return jsonify({
         'running': scheduler.running,

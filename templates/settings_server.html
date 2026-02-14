@@ -51,30 +51,6 @@
         </div>
     </div>
     
-    <!-- Scheduler Status Card -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Scheduler Status</h3>
-            <div class="card-header-actions">
-                <button class="btn btn-outline btn-sm" onclick="rescheduleAllJobs()" id="reschedule-btn">
-                    Reschedule All
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="loadSchedulerStatus()">
-                    Refresh
-                </button>
-            </div>
-        </div>
-        <div class="card-block">
-            <div id="scheduler-status">
-                <div class="loading-state">
-                    <span class="spinner"></span>
-                    <span>Loading scheduler status...</span>
-                </div>
-            </div>
-            <div id="reschedule-status" class="status-message" style="display: none; margin-top: 1rem;"></div>
-        </div>
-    </div>
-    
     <!-- Restart Server Card -->
     <div class="card card-danger">
         <div class="card-header">
@@ -436,87 +412,6 @@
         background-color: #c92100;
     }
     
-    /* Card Header Actions */
-    .card-header-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-    
-    /* Scheduler Status */
-    .scheduler-header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1rem;
-    }
-    
-    .scheduler-status-label {
-        font-size: 0.85rem;
-        color: #666;
-    }
-    
-    .status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        font-size: 0.7rem;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        border-radius: 0.5rem;
-    }
-    
-    .status-badge-success {
-        background-color: #60b515;
-        color: #fff;
-    }
-    
-    .status-badge-danger {
-        background-color: #c92100;
-        color: #fff;
-    }
-    
-    .scheduler-jobs {
-        margin-top: 1rem;
-    }
-    
-    .scheduler-jobs-title {
-        font-size: 0.8rem;
-        font-weight: 500;
-        color: #666;
-        margin-bottom: 0.75rem;
-    }
-    
-    .scheduler-job {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem 1rem;
-        background: #f5f5f5;
-        border-radius: 3px;
-        margin-bottom: 0.5rem;
-    }
-    
-    .scheduler-job:last-child {
-        margin-bottom: 0;
-    }
-    
-    .scheduler-job-name {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #313131;
-    }
-    
-    .scheduler-job-next {
-        font-size: 0.8rem;
-        color: #666;
-    }
-    
-    .scheduler-empty {
-        color: #666;
-        font-size: 0.9rem;
-        font-style: italic;
-    }
-    
     /* Alert - Clarity Style */
     .alert {
         display: flex;
@@ -705,94 +600,6 @@
         }
     }
     
-    async function loadSchedulerStatus() {
-        const statusDiv = document.getElementById('scheduler-status');
-        statusDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading scheduler status...</span></div>';
-        
-        try {
-            const response = await fetch('/api/scheduler/status');
-            if (response.ok) {
-                const data = await response.json();
-                
-                let html = `
-                    <div class="scheduler-header">
-                        <span class="scheduler-status-label">Status:</span>
-                        <span class="status-badge ${data.running ? 'status-badge-success' : 'status-badge-danger'}">
-                            ${data.running ? 'Running' : 'Stopped'}
-                        </span>
-                    </div>
-                `;
-                
-                if (data.jobs && data.jobs.length > 0) {
-                    html += `
-                        <div class="scheduler-jobs">
-                            <div class="scheduler-jobs-title">Scheduled Jobs (${data.job_count})</div>
-                    `;
-                    
-                    for (const job of data.jobs) {
-                        const nextRun = job.next_run_time ? new Date(job.next_run_time).toLocaleString() : 'Not scheduled';
-                        html += `
-                            <div class="scheduler-job">
-                                <span class="scheduler-job-name">${job.id}</span>
-                                <span class="scheduler-job-next">Next: ${nextRun}</span>
-                            </div>
-                        `;
-                    }
-                    
-                    html += '</div>';
-                } else {
-                    html += '<p class="scheduler-empty">No scheduled jobs</p>';
-                }
-                
-                statusDiv.innerHTML = html;
-            }
-        } catch (error) {
-            console.error('Error loading scheduler status:', error);
-            statusDiv.innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
-        }
-    }
-    
-    async function rescheduleAllJobs() {
-        const statusDiv = document.getElementById('reschedule-status');
-        const rescheduleBtn = document.getElementById('reschedule-btn');
-        
-        statusDiv.style.display = 'block';
-        statusDiv.className = 'status-message status-info';
-        statusDiv.innerHTML = '<span class="spinner" style="display: inline-block; margin-right: 0.5rem;"></span> Rescheduling jobs...';
-        rescheduleBtn.disabled = true;
-        
-        try {
-            const response = await fetch('/api/scheduler/reschedule', {
-                method: 'POST'
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                statusDiv.className = 'status-message status-success';
-                statusDiv.innerHTML = `✓ ${data.message}. Total jobs: ${data.total_jobs_scheduled}`;
-                
-                // Refresh the scheduler status after a short delay
-                setTimeout(() => {
-                    loadSchedulerStatus();
-                    // Hide the status message after 5 seconds
-                    setTimeout(() => {
-                        statusDiv.style.display = 'none';
-                    }, 5000);
-                }, 500);
-            } else {
-                statusDiv.className = 'status-message status-error';
-                statusDiv.innerHTML = `✕ Failed to reschedule: ${data.error || 'Unknown error'}`;
-            }
-        } catch (error) {
-            console.error('Error rescheduling jobs:', error);
-            statusDiv.className = 'status-message status-error';
-            statusDiv.innerHTML = '✕ Failed to reschedule jobs. Please try again.';
-        } finally {
-            rescheduleBtn.disabled = false;
-        }
-    }
-    
     async function restartServer() {
         if (!confirm('Are you sure you want to restart the server?\n\nAll users will be disconnected and need to log in again.\n\nThis will take approximately 5-10 seconds.')) {
             return;
@@ -835,7 +642,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         loadVersionInfo();
         loadStorageInfo();
-        loadSchedulerStatus();
     });
 </script>
 {% endblock %}

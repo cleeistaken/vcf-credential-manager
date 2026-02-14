@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% block title %}Scheduled Jobs - VCF Credentials Manager{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <a href="{{ url_for('settings') }}" class="btn btn-link">
+                <span class="btn-icon">←</span> Back to Settings
+            </a>
+            <h1>Scheduled Jobs</h1>
+            <p class="header-description">Monitor and manage automatic credential synchronization jobs</p>
+        </div>
+    </div>
+    
+    <!-- Scheduler Status Card -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Scheduler Status</h3>
+            <div class="card-header-actions">
+                <button class="btn btn-outline btn-sm" onclick="rescheduleAllJobs()" id="reschedule-btn">
+                    Reschedule All
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="loadSchedulerStatus()">
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div class="card-block">
+            <div id="scheduler-status-header">
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading scheduler status...</span>
+                </div>
+            </div>
+            <div id="reschedule-status" class="status-message" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <!-- Scheduled Jobs Card -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Active Jobs</h3>
+            <span id="job-count-badge" class="job-count-badge" style="display: none;">0</span>
+        </div>
+        <div class="card-block">
+            <div id="scheduled-jobs">
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading scheduled jobs...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Card -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">About Scheduled Jobs</h3>
+        </div>
+        <div class="card-block">
+            <div class="help-content">
+                <p>Scheduled jobs automatically synchronize credentials from your VCF environments at regular intervals.</p>
+                
+                <div class="help-section">
+                    <h4>Sync Types</h4>
+                    <ul class="help-list">
+                        <li><span class="sync-type-badge sync-type-installer">Installer</span> Syncs credentials from the VCF Installer appliance</li>
+                        <li><span class="sync-type-badge sync-type-manager">Manager</span> Syncs credentials from the SDDC Manager</li>
+                    </ul>
+                </div>
+                
+                <div class="help-section">
+                    <h4>Managing Sync Schedules</h4>
+                    <p>To change sync intervals or enable/disable sync for an environment, edit the environment from the <a href="{{ url_for('dashboard') }}">Dashboard</a>.</p>
+                </div>
+                
+                <div class="help-section">
+                    <h4>Troubleshooting</h4>
+                    <p>If jobs are missing after a server restart, click <strong>Reschedule All</strong> to re-register all sync jobs with the scheduler.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Container */
+    .settings-container {
+        padding: 1.5rem 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    /* Page Header */
+    .page-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .header-content h1 {
+        margin: 0.5rem 0 0.25rem 0;
+        font-size: 1.5rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .header-description {
+        color: #666;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    /* Button Styles - Clarity */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        padding: 0 0.75rem;
+        height: 36px;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 3px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+        text-decoration: none;
+    }
+    
+    .btn-sm {
+        height: 28px;
+        padding: 0 0.5rem;
+        font-size: 0.6rem;
+    }
+    
+    .btn-icon {
+        font-size: 1.1em;
+    }
+    
+    .btn-link {
+        background: transparent;
+        border-color: transparent;
+        color: #0072a3;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+        padding: 0;
+        height: auto;
+    }
+    
+    .btn-link:hover {
+        text-decoration: underline;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border-color: #0072a3;
+        color: #0072a3;
+    }
+    
+    .btn-outline:hover {
+        background-color: #e8f4f8;
+    }
+    
+    .btn-outline:disabled {
+        border-color: #9a9a9a;
+        color: #9a9a9a;
+        cursor: not-allowed;
+    }
+    
+    /* Card - Clarity Style */
+    .card {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 1.25rem;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .card-title {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #313131;
+    }
+    
+    .card-header-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .card-block {
+        padding: 1.25rem;
+    }
+    
+    /* Loading State */
+    .loading-state {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #e0e0e0;
+        border-top-color: #0072a3;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Scheduler Status Header */
+    .scheduler-status-row {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+    
+    .scheduler-status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .scheduler-status-label {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-radius: 0.5rem;
+    }
+    
+    .status-badge-success {
+        background-color: #60b515;
+        color: #fff;
+    }
+    
+    .status-badge-danger {
+        background-color: #c92100;
+        color: #fff;
+    }
+    
+    /* Job Count Badge */
+    .job-count-badge {
+        background-color: #0072a3;
+        color: #fff;
+        padding: 0.2rem 0.6rem;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    /* Scheduled Jobs List */
+    .jobs-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .job-card {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        background: #f9f9f9;
+        border: 1px solid #e8e8e8;
+        border-radius: 3px;
+        transition: border-color 0.15s ease;
+    }
+    
+    .job-card:hover {
+        border-color: #0072a3;
+    }
+    
+    .job-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #e8f4f8;
+        border-radius: 3px;
+        margin-right: 1rem;
+        flex-shrink: 0;
+        font-size: 1.25rem;
+    }
+    
+    .job-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .job-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .job-environment {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .sync-type-badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-radius: 3px;
+    }
+    
+    .sync-type-installer {
+        background-color: #e8f4f8;
+        color: #0072a3;
+        border: 1px solid #b3d9e8;
+    }
+    
+    .sync-type-manager {
+        background-color: #f0e8f8;
+        color: #6a1b9a;
+        border: 1px solid #d1b3e8;
+    }
+    
+    .job-details {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        font-size: 0.8rem;
+        color: #666;
+    }
+    
+    .job-detail {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    
+    .job-detail-icon {
+        font-size: 0.9rem;
+        opacity: 0.7;
+    }
+    
+    .job-timing {
+        text-align: right;
+        flex-shrink: 0;
+    }
+    
+    .job-next-run {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #313131;
+    }
+    
+    .job-countdown {
+        font-size: 0.75rem;
+        color: #666;
+        margin-top: 0.15rem;
+    }
+    
+    .job-countdown.overdue {
+        color: #c92100;
+        font-weight: 500;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: #666;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .empty-state-title {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #313131;
+        margin-bottom: 0.5rem;
+    }
+    
+    .empty-state-description {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Help Content */
+    .help-content {
+        font-size: 0.9rem;
+        color: #666;
+        line-height: 1.6;
+    }
+    
+    .help-content p {
+        margin: 0 0 1rem 0;
+    }
+    
+    .help-content a {
+        color: #0072a3;
+    }
+    
+    .help-section {
+        margin-bottom: 1.25rem;
+    }
+    
+    .help-section:last-child {
+        margin-bottom: 0;
+    }
+    
+    .help-section h4 {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #313131;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .help-section p {
+        margin: 0;
+    }
+    
+    .help-list {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+    }
+    
+    .help-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .help-list li:last-child {
+        margin-bottom: 0;
+    }
+    
+    /* Status Message */
+    .status-message {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 3px;
+        font-size: 0.875rem;
+    }
+    
+    .status-message.status-info {
+        background-color: #e1f5fe;
+        border: 1px solid #b3e5fc;
+        color: #01579b;
+    }
+    
+    .status-message.status-success {
+        background-color: #e6f4ea;
+        border: 1px solid #b7e1cd;
+        color: #1e7e34;
+    }
+    
+    .status-message.status-error {
+        background-color: #fce8e6;
+        border: 1px solid #f5c6cb;
+        color: #c92100;
+    }
+    
+    .text-muted {
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSchedulerStatus();
+    });
+    
+    async function loadSchedulerStatus() {
+        const headerDiv = document.getElementById('scheduler-status-header');
+        const jobsDiv = document.getElementById('scheduled-jobs');
+        const countBadge = document.getElementById('job-count-badge');
+        
+        headerDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading scheduler status...</span></div>';
+        jobsDiv.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Loading scheduled jobs...</span></div>';
+        
+        try {
+            const response = await fetch('/api/scheduler/status');
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update header
+                headerDiv.innerHTML = `
+                    <div class="scheduler-status-row">
+                        <div class="scheduler-status-item">
+                            <span class="scheduler-status-label">Status:</span>
+                            <span class="status-badge ${data.running ? 'status-badge-success' : 'status-badge-danger'}">
+                                ${data.running ? 'Running' : 'Stopped'}
+                            </span>
+                        </div>
+                        <div class="scheduler-status-item">
+                            <span class="scheduler-status-label">Active Jobs:</span>
+                            <span>${data.job_count}</span>
+                        </div>
+                        <div class="scheduler-status-item">
+                            <span class="scheduler-status-label">Server Time:</span>
+                            <span>${data.current_time}</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Update job count badge
+                countBadge.textContent = data.job_count;
+                countBadge.style.display = data.job_count > 0 ? 'inline-block' : 'none';
+                
+                // Update jobs list
+                if (data.jobs && data.jobs.length > 0) {
+                    let jobsHtml = '<div class="jobs-list">';
+                    
+                    for (const job of data.jobs) {
+                        const envName = job.environment_name || 'Unknown Environment';
+                        const syncType = job.sync_type || 'unknown';
+                        const syncTypeLabel = syncType.charAt(0).toUpperCase() + syncType.slice(1);
+                        const syncTypeClass = `sync-type-${syncType}`;
+                        const icon = syncType === 'installer' ? '📦' : '🖥️';
+                        
+                        const nextRun = job.next_run_time_local || 'Not scheduled';
+                        const countdown = job.time_until_next_run || '';
+                        const countdownClass = countdown === 'overdue' ? 'overdue' : '';
+                        
+                        const interval = job.interval_minutes ? `Every ${job.interval_minutes} min` : '';
+                        
+                        jobsHtml += `
+                            <div class="job-card">
+                                <div class="job-icon">${icon}</div>
+                                <div class="job-info">
+                                    <div class="job-header">
+                                        <span class="job-environment">${envName}</span>
+                                        <span class="sync-type-badge ${syncTypeClass}">${syncTypeLabel}</span>
+                                    </div>
+                                    <div class="job-details">
+                                        <div class="job-detail">
+                                            <span class="job-detail-icon">🔄</span>
+                                            <span>${interval}</span>
+                                        </div>
+                                        <div class="job-detail">
+                                            <span class="job-detail-icon">🆔</span>
+                                            <span>${job.id}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="job-timing">
+                                    <div class="job-next-run">${nextRun}</div>
+                                    <div class="job-countdown ${countdownClass}">${countdown}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    jobsHtml += '</div>';
+                    jobsDiv.innerHTML = jobsHtml;
+                } else {
+                    jobsDiv.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📅</div>
+                            <div class="empty-state-title">No Scheduled Jobs</div>
+                            <div class="empty-state-description">
+                                No credential sync jobs are currently scheduled.<br>
+                                Enable sync on an environment to create scheduled jobs.
+                            </div>
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+                                Go to Dashboard
+                            </a>
+                        </div>
+                    `;
+                }
+            } else {
+                headerDiv.innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
+                jobsDiv.innerHTML = '<p class="text-muted">Unable to load scheduled jobs</p>';
+            }
+        } catch (error) {
+            console.error('Error loading scheduler status:', error);
+            headerDiv.innerHTML = '<p class="text-muted">Unable to load scheduler status</p>';
+            jobsDiv.innerHTML = '<p class="text-muted">Unable to load scheduled jobs</p>';
+        }
+    }
+    
+    async function rescheduleAllJobs() {
+        const statusDiv = document.getElementById('reschedule-status');
+        const rescheduleBtn = document.getElementById('reschedule-btn');
+        
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'status-message status-info';
+        statusDiv.innerHTML = '<span class="spinner" style="display: inline-block; margin-right: 0.5rem;"></span> Rescheduling jobs...';
+        rescheduleBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/scheduler/reschedule', {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                statusDiv.className = 'status-message status-success';
+                statusDiv.innerHTML = `✓ ${data.message}. Total jobs: ${data.total_jobs_scheduled}`;
+                
+                // Refresh the scheduler status after a short delay
+                setTimeout(() => {
+                    loadSchedulerStatus();
+                    // Hide the status message after 5 seconds
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 5000);
+                }, 500);
+            } else {
+                statusDiv.className = 'status-message status-error';
+                statusDiv.innerHTML = `✕ Failed to reschedule: ${data.error || 'Unknown error'}`;
+            }
+        } catch (error) {
+            console.error('Error rescheduling jobs:', error);
+            statusDiv.className = 'status-message status-error';
+            statusDiv.innerHTML = '✕ Failed to reschedule jobs. Please try again.';
+        } finally {
+            rescheduleBtn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}

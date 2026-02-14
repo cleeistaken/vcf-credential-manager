@@ -64,6 +64,18 @@
             </div>
             <div class="settings-card-arrow">→</div>
         </a>
+        
+        <!-- Scheduled Jobs -->
+        <a href="{{ url_for('settings_scheduler') }}" class="settings-card">
+            <div class="settings-card-icon-wrapper">
+                <span class="settings-card-icon">📅</span>
+            </div>
+            <div class="settings-card-content">
+                <h3 class="settings-card-title">Scheduled Jobs</h3>
+                <p class="settings-card-description">Monitor automatic credential sync schedules</p>
+            </div>
+            <div class="settings-card-arrow">→</div>
+        </a>
     </div>
 </div>
 {% endblock %}
