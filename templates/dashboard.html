@@ -19,6 +19,14 @@
                 <span class="btn-icon">↑</span> Import from File
             </button>
             {% endif %}
+            <div class="view-toggle">
+                <button class="btn btn-outline btn-sm view-toggle-btn active" id="grid-view-btn" onclick="setView('grid')" title="Grid View">
+                    <span class="view-icon">▦</span>
+                </button>
+                <button class="btn btn-outline btn-sm view-toggle-btn" id="list-view-btn" onclick="setView('list')" title="List View">
+                    <span class="view-icon">☰</span>
+                </button>
+            </div>
         </div>
     </div>
     
@@ -524,11 +532,116 @@ manager_sync_interval_minutes: 60</pre>
         content: "✕";
     }
     
+    /* View Toggle */
+    .view-toggle {
+        display: flex;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-left: 0.5rem;
+    }
+    
+    .view-toggle-btn {
+        border: none;
+        border-radius: 0;
+        height: 36px;
+        width: 36px;
+        padding: 0;
+        background: #fff;
+        color: #666;
+    }
+    
+    .view-toggle-btn:first-child {
+        border-right: 1px solid #ccc;
+    }
+    
+    .view-toggle-btn:hover {
+        background: #f0f0f0;
+    }
+    
+    .view-toggle-btn.active {
+        background: #0072a3;
+        color: #fff;
+    }
+    
+    .view-toggle-btn.active:hover {
+        background: #005a82;
+    }
+    
+    .view-icon {
+        font-size: 1rem;
+    }
+    
     /* Environment Grid */
     .env-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
         gap: 1.25rem;
+    }
+    
+    /* Environment List View */
+    .env-grid.list-view {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .env-grid.list-view .env-card {
+        flex-direction: row;
+        align-items: stretch;
+        border-radius: 0;
+        border-bottom: none;
+    }
+    
+    .env-grid.list-view .env-card:first-child {
+        border-radius: 3px 3px 0 0;
+    }
+    
+    .env-grid.list-view .env-card:last-child {
+        border-radius: 0 0 3px 3px;
+        border-bottom: 1px solid #ccc;
+    }
+    
+    .env-grid.list-view .env-card:only-child {
+        border-radius: 3px;
+        border-bottom: 1px solid #ccc;
+    }
+    
+    .env-grid.list-view .env-card-header {
+        flex: 0 0 200px;
+        border-bottom: none;
+        border-right: 1px solid #e8e8e8;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    
+    .env-grid.list-view .env-card-description {
+        display: none;
+    }
+    
+    .env-grid.list-view .env-info-grid {
+        flex: 1;
+        border-bottom: none;
+        border-right: 1px solid #e8e8e8;
+        align-items: center;
+        padding: 0.75rem 1rem;
+    }
+    
+    .env-grid.list-view .env-stats {
+        flex: 0 0 220px;
+        border-bottom: none;
+        border-right: 1px solid #e8e8e8;
+        justify-content: space-evenly;
+        padding: 0.75rem;
+    }
+    
+    .env-grid.list-view .env-card-actions {
+        flex: 0 0 auto;
+        padding: 0.5rem 0.75rem;
+        margin-top: 0;
+        align-items: center;
     }
     
     /* Environment Card - Clarity Style */
@@ -1138,6 +1251,34 @@ manager_sync_interval_minutes: 60</pre>
             document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
                 menu.classList.remove('show');
             });
+        }
+    });
+    
+    // View toggle functionality
+    function setView(view) {
+        const grid = document.getElementById('environments-grid');
+        const gridBtn = document.getElementById('grid-view-btn');
+        const listBtn = document.getElementById('list-view-btn');
+        
+        if (view === 'list') {
+            grid.classList.add('list-view');
+            gridBtn.classList.remove('active');
+            listBtn.classList.add('active');
+        } else {
+            grid.classList.remove('list-view');
+            gridBtn.classList.add('active');
+            listBtn.classList.remove('active');
+        }
+        
+        // Save preference to localStorage
+        localStorage.setItem('dashboardView', view);
+    }
+    
+    // Initialize view from saved preference
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedView = localStorage.getItem('dashboardView');
+        if (savedView) {
+            setView(savedView);
         }
     });
 </script>
