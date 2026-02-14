@@ -58,8 +58,8 @@
             
             <!-- Info Grid -->
             <div class="env-info-grid">
-                {% if env.installer_host %}
-                <div class="env-info-item">
+                <div class="env-info-item env-info-installer {% if not env.installer_host %}env-info-item-empty{% endif %}">
+                    {% if env.installer_host %}
                     <div class="env-info-label">VCF Installer</div>
                     <div class="env-info-value">{{ env.installer_host }}</div>
                     {% if env.installer_error %}
@@ -67,11 +67,11 @@
                         <span class="error-icon">⚠</span> {{ env.installer_error[:40] }}{% if env.installer_error|length > 40 %}...{% endif %}
                     </div>
                     {% endif %}
+                    {% endif %}
                 </div>
-                {% endif %}
                 
-                {% if env.manager_host %}
-                <div class="env-info-item">
+                <div class="env-info-item env-info-manager {% if not env.manager_host %}env-info-item-empty{% endif %}">
+                    {% if env.manager_host %}
                     <div class="env-info-label">SDDC Manager</div>
                     <div class="env-info-value">{{ env.manager_host }}</div>
                     {% if env.manager_error %}
@@ -79,8 +79,8 @@
                         <span class="error-icon">⚠</span> {{ env.manager_error[:40] }}{% if env.manager_error|length > 40 %}...{% endif %}
                     </div>
                     {% endif %}
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
             
             <!-- Stats Row -->
@@ -608,7 +608,7 @@ manager_sync_interval_minutes: 60</pre>
     }
     
     .env-grid.list-view .env-card-header {
-        flex: 0 0 200px;
+        flex: 0 0 180px;
         border-bottom: none;
         border-right: 1px solid #e8e8e8;
         flex-direction: column;
@@ -622,11 +622,22 @@ manager_sync_interval_minutes: 60</pre>
     }
     
     .env-grid.list-view .env-info-grid {
-        flex: 1;
+        display: flex;
+        flex: 0 0 auto;
         border-bottom: none;
-        border-right: 1px solid #e8e8e8;
-        align-items: center;
+        align-items: stretch;
+        padding: 0;
+        gap: 0;
+    }
+    
+    .env-grid.list-view .env-info-item {
+        flex: 0 0 200px;
         padding: 0.75rem 1rem;
+        border-right: 1px solid #e8e8e8;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 60px;
     }
     
     .env-grid.list-view .env-stats {
@@ -718,6 +729,16 @@ manager_sync_interval_minutes: 60</pre>
     
     .env-info-item {
         min-width: 0;
+    }
+    
+    /* Hide empty info items in grid/card view */
+    .env-info-item-empty {
+        display: none;
+    }
+    
+    /* But show them in list view to maintain column alignment */
+    .env-grid.list-view .env-info-item-empty {
+        display: flex;
     }
     
     .env-info-label {

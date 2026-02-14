@@ -300,7 +300,7 @@ async function saveEnvironment() {
         }
         
         if (response.ok) {
-            closeEnvironmentModal();
+            closeEnvironmentModal(true);  // Force close - changes were saved
             location.reload();
         } else {
             const errorData = await response.json();
