@@ -1,9 +1,9 @@
 {
-  "version": "42f4262",
+  "version": "bcaf1ad",
   "build_type": "development",
   "branch": "main",
-  "commit": "42f426229e72ed606456586b3350e1a6cfd4fcc7",
-  "commit_short": "42f4262",
+  "commit": "bcaf1ad26839d7e462dcc3b188e2bbb20110313f",
+  "commit_short": "bcaf1ad",
   "build_date": "2026-02-14",
-  "build_timestamp": "2026-02-14T00:24:56Z"
+  "build_timestamp": "2026-02-14T01:06:54Z"
 }
