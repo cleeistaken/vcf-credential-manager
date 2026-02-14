@@ -45,25 +45,43 @@ jobs:
 
     - name: Create release archive
       run: |
-        zip -r vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip . \
-          -x "*.git*" \
-          -x "*.idea/*" \
-          -x "*__pycache__/*" \
-          -x "*.pyc" \
-          -x "*.pyo" \
-          -x "*.DS_Store" \
-          -x "*.env" \
-          -x "instance/*" \
-          -x "logs/*" \
-          -x "ssl/*.pem" \
-          -x "ssl/*.key" \
-          -x "ssl/*.crt" \
-          -x "*.db" \
-          -x "Pipfile.lock"
+        ARCHIVE_NAME="vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}"
+        
+        # Create a temporary directory with the archive name
+        mkdir -p "/tmp/${ARCHIVE_NAME}"
+        
+        # Copy files to the temporary directory, excluding unwanted files
+        rsync -av \
+          --exclude='.git' \
+          --exclude='.idea' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='*.pyo' \
+          --exclude='.DS_Store' \
+          --exclude='.env' \
+          --exclude='instance' \
+          --exclude='logs' \
+          --exclude='ssl/*.pem' \
+          --exclude='ssl/*.key' \
+          --exclude='ssl/*.crt' \
+          --exclude='*.db' \
+          --exclude='Pipfile.lock' \
+          . "/tmp/${ARCHIVE_NAME}/"
+        
+        # Create zip archive from the parent directory so it includes the folder name
+        cd /tmp
+        zip -r "${GITHUB_WORKSPACE}/${ARCHIVE_NAME}.zip" "${ARCHIVE_NAME}"
+        
+        # Clean up
+        rm -rf "/tmp/${ARCHIVE_NAME}"
 
     - name: Create tarball archive
       run: |
-        tar --exclude='.git' \
+        ARCHIVE_NAME="vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}"
+        
+        # Use --transform to prepend the folder name to all paths
+        tar --transform "s,^\\.,${ARCHIVE_NAME}," \
+            --exclude='.git' \
             --exclude='.idea' \
             --exclude='__pycache__' \
             --exclude='*.pyc' \
@@ -80,7 +98,7 @@ jobs:
             --exclude='*.zip' \
             --exclude='*.tar.gz' \
             --ignore-failed-read \
-            -czvf vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.tar.gz . || [[ $? -eq 1 ]]
+            -czvf "${ARCHIVE_NAME}.tar.gz" . || [[ $? -eq 1 ]]
 
     - name: Generate release notes
       run: |
@@ -92,9 +110,12 @@ jobs:
         #### Option 1: Quick Start (Development)
         
         ```bash
-        # Extract the archive
-        unzip vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-manager
-        cd vcf-credentials-manager
+        # Extract the archive (extracts to vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}/)
+        unzip vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip
+        # Or using tar:
+        # tar -xzf vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        
+        cd vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}
         
         # Install dependencies
         pip install -r requirements.txt
@@ -110,9 +131,12 @@ jobs:
         For Ubuntu 24.04, use the automated installer to set up as a systemd service:
         
         ```bash
-        # Extract the archive
-        unzip vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip -d vcf-credentials-manager
-        cd vcf-credentials-manager/tools
+        # Extract the archive (extracts to vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}/)
+        unzip vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip
+        # Or using tar:
+        # tar -xzf vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        
+        cd vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}/tools
         
         # Run the installer (copies files to /opt/vcf-credential-manager)
         sudo ./install-vcf-credential-manager.sh
@@ -128,6 +152,17 @@ jobs:
         - Configure firewall (UFW)
         
         See [Ubuntu Service Installation Guide](docs/UBUNTU_SERVICE_INSTALL.md) for details.
+        
+        #### Updating an Existing Installation
+        
+        ```bash
+        # Extract the new release
+        unzip vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}.zip
+        cd vcf-credential-manager-rel-${{ steps.get_version.outputs.VERSION }}/tools
+        
+        # Run the update script (preserves database, SSL certs, and logs)
+        sudo ./update-vcf-credential-manager.sh
+        ```
         
         ### Default Credentials
         

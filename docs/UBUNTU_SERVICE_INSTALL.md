@@ -10,13 +10,15 @@ Automated installation script for VCF Credential Manager on Ubuntu 24.04 as a sy
 
 ```bash
 # 1. Download the latest release
-wget https://github.com/cleeistaken/vcf-credential-manager/releases/latest/download/vcf-credentials-manager-rel-vX.X.X.zip
+wget https://github.com/cleeistaken/vcf-credential-manager/releases/latest/download/vcf-credential-manager-rel-vX.X.X.zip
 
-# 2. Extract the archive
-unzip vcf-credentials-manager-rel-vX.X.X.zip -d vcf-credential-manager
-cd vcf-credential-manager/tools
+# 2. Extract the archive (extracts to vcf-credential-manager-rel-vX.X.X/)
+unzip vcf-credential-manager-rel-vX.X.X.zip
+# Or using tar:
+# tar -xzf vcf-credential-manager-rel-vX.X.X.tar.gz
 
 # 3. Run installation
+cd vcf-credential-manager-rel-vX.X.X/tools
 sudo ./install-vcf-credential-manager.sh
 
 # 4. Access application
@@ -247,21 +249,80 @@ sudo cp /opt/vcf-credential-manager/ssl/*.pem ~/backup/
 
 ## Update Application
 
-### Option 1: Re-run Installer with New Release
+### Option 1: Use the Update Script (Recommended)
+
+The update script preserves your database, SSL certificates, and logs while updating the application code.
 
 ```bash
 # 1. Download the new release
-wget https://github.com/cleeistaken/vcf-credential-manager/releases/latest/download/vcf-credentials-manager-rel-vX.X.X.zip
+wget https://github.com/cleeistaken/vcf-credential-manager/releases/latest/download/vcf-credential-manager-rel-vX.X.X.zip
 
-# 2. Extract the archive
-unzip vcf-credentials-manager-rel-vX.X.X.zip -d vcf-credential-manager-new
-cd vcf-credential-manager-new/tools
+# 2. Extract the archive (extracts to vcf-credential-manager-rel-vX.X.X/)
+unzip vcf-credential-manager-rel-vX.X.X.zip
+# Or using tar:
+# tar -xzf vcf-credential-manager-rel-vX.X.X.tar.gz
 
-# 3. Re-run the installer (will backup existing installation)
-sudo ./install-vcf-credential-manager.sh
+# 3. Run the update script
+cd vcf-credential-manager-rel-vX.X.X/tools
+sudo ./update-vcf-credential-manager.sh
 ```
 
-### Option 2: Manual Update
+**Update script options:**
+```bash
+# Normal update with automatic backup
+sudo ./update-vcf-credential-manager.sh
+
+# Update without creating a backup
+sudo ./update-vcf-credential-manager.sh --no-backup
+
+# Force update even if versions match
+sudo ./update-vcf-credential-manager.sh --force
+
+# Show help
+sudo ./update-vcf-credential-manager.sh --help
+```
+
+**What the update script preserves:**
+- Database (credentials, environments, users)
+- SSL certificates
+- Log files
+
+**What gets updated:**
+- Application code
+- Static files (CSS, JS, images)
+- Templates
+- Python dependencies
+
+**Rollback:** Backups are stored in `/opt/vcf-credential-manager-backups/`. To rollback:
+```bash
+sudo systemctl stop vcf-credential-manager
+sudo cp -a /opt/vcf-credential-manager-backups/backup_YYYYMMDD_HHMMSS/installation/* /opt/vcf-credential-manager/
+sudo systemctl start vcf-credential-manager
+```
+
+### Option 2: Re-run Installer (Fresh Install)
+
+This creates a backup of the existing installation but does NOT preserve the database.
+
+```bash
+# 1. Backup your database first!
+sudo cp /opt/vcf-credential-manager/instance/vcf_credentials.db ~/backup/
+
+# 2. Download the new release
+wget https://github.com/cleeistaken/vcf-credential-manager/releases/latest/download/vcf-credential-manager-rel-vX.X.X.zip
+
+# 3. Extract and run installer (extracts to vcf-credential-manager-rel-vX.X.X/)
+unzip vcf-credential-manager-rel-vX.X.X.zip
+cd vcf-credential-manager-rel-vX.X.X/tools
+sudo ./install-vcf-credential-manager.sh
+
+# 4. Restore database (optional)
+sudo systemctl stop vcf-credential-manager
+sudo cp ~/backup/vcf_credentials.db /opt/vcf-credential-manager/instance/
+sudo systemctl start vcf-credential-manager
+```
+
+### Option 3: Manual Update
 
 ```bash
 # Stop service
